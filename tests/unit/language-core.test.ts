@@ -42,14 +42,29 @@ describe('frequency index', () => {
   const words = ['the', 'of', 'and', 'study', 'house', 'running', 'observe'];
   const index = createFrequencyIndex(words, (s) => createLemmatizer({ knownLemmas: new Set(words) }).lemma(s));
 
-  it('returns surface rank first', () => {
+  it('prefers the lemma rank (learner knowledge attaches to lemmas)', () => {
     expect(index.rankOf('study')).toBe(4);
-    expect(index.rankOf('running')).toBe(6); // surface listed → its own rank
+    expect(index.rankOf('studies')).toBe(4); // lemma 'study' outranks any surface listing
   });
 
-  it('falls back to lemma rank for inflections', () => {
-    expect(index.rankOf('studies')).toBe(4); // lemma 'study'
-    expect(index.rankOf('houses')).toBe(5); // lemma 'house'
+  it('falls back to the surface rank when the lemma is unlisted', () => {
+    expect(index.rankOf('running')).toBe(6); // 'run' not in list → surface rank
+    expect(index.rankOf('houses')).toBe(5); // 'house' listed → lemma rank
+  });
+
+  it('never lets a bogus rare "lemma" outrank a common surface', () => {
+    // Regression: the real corpus contains the rare word "fam" (~19k), so
+    // suffix rules "validated" family→fam and every "family" got flagged.
+    const corpus = [...Array(400).keys()].map((i) => `zz${i}`);
+    corpus[3] = 'family'; // rank 4
+    corpus[399] = 'fam'; // rank 400 — the trap
+    const index = createFrequencyIndex(corpus, (s) =>
+      createLemmatizer({ knownLemmas: new Set(corpus) }).lemma(s),
+    );
+    expect(index.rank('fam')).toBe(400); // junk lemma exists in corpus…
+    expect(index.rankOf('family')).toBe(4); // …but never wins over the surface
+    expect(index.resolveForm('family')).toBe('family');
+    expect(index.isRarerThan('family', '5k')).toBe(false);
   });
 
   it('returns 0 for rare/unknown words', () => {
@@ -73,10 +88,10 @@ describe('frequency index over real bundled data', () => {
 
     expect(index.rankOf('study')).toBeGreaterThan(0);
     expect(index.rankOf('the')).toBeLessThan(5);
-    // Surface-first design: listed inflections keep their own corpus rank…
-    expect(index.rankOf('studying')).toBeGreaterThan(0);
-    // …while unlisted inflections fall back to their lemma's rank
-    // ('observes' is not in the corpus list; 'observe' is rank 7565).
+    // Lemma-first: 'studying' (surface 6255) counts as its lemma 'study'
+    // (rank 484) — a learner who knows "study" knows "studying".
+    expect(index.rankOf('studying')).toBe(index.rankOf('study'));
+    // Inflections of unlisted lemmas fall back to their surface rank.
     expect(index.rankOf('observes')).toBe(index.rankOf('observe'));
     expect(index.isRarerThan('study', '2k')).toBe(false);
     expect(index.isRarerThan('serendipity', '20k')).toBe(true); // absent → rare

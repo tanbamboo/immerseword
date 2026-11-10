@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>The Quiet Hour — a fixture article for ImmerseWord</title>
+  <style>
+    body { font-family: Georgia, serif; max-width: 640px; margin: 40px auto; line-height: 1.6; }
+    h1 { font-size: 26px; }
+  </style>
+</head>
+<body>
+  <article>
+    <h1>The Quiet Hour</h1>
+    <p id="para-common">
+      The old house stood at the end of the road, and every evening it felt
+      beautiful and quiet. The family ate dinner together and talked about the day.
+    </p>
+    <p id="para-rare">
+      After the rain there was serendipity in the air — a faint petrichor that
+      made the whole street seem ephemeral, almost gossamer, as if the moment
+      might dissolve into pure tintinnabulation.
+    </p>
+    <p id="para-mixed">
+      She kept studying for the exam because she wanted to observe how language
+      slowly reveals itself, word by word.
+    </p>
+    <pre id="code-block">const serendipity = "petrichor"; // code is never tagged</pre>
+    <textarea id="notes">serendipity petrichor ephemeral</textarea>
+  </article>
+  <button id="append-more">Load more</button>
+  <script>
+    document.getElementById('append-more').addEventListener('click', () => {
+      const p = document.createElement('p');
+      p.id = 'para-dynamic';
+      p.textContent = 'New paragraphs bring defenestration and susurrus to the page.';
+      document.querySelector('article').appendChild(p);
+    });
+  </script>
+</body>
+</html>
