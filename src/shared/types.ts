@@ -21,7 +21,8 @@ export type IwMessage =
       lemma: string;
       entry: DictionaryEntry | null;
       source: 'core' | 'api' | 'cache' | 'none';
-    };
+    }
+  | { type: 'IW_SHOW_LOOKUP'; lemma: string };
 
 /** Normalized monolingual dictionary entry (bundled core and API both map to this). */
 export interface DictionaryEntry {

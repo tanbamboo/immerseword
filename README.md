@@ -18,7 +18,7 @@ language-learning session:
 | PR-0 | Scaffold, toolchain, smoke E2E | ✅ merged |
 | PR-1 | Language core & dictionary data | ✅ merged |
 | PR-2 | Word tagging engine | ✅ merged |
-| PR-3 | Popover & vocabulary | ⬜ |
+| PR-3 | Popover & vocabulary | ✅ merged |
 | PR-4 | Side panel reading companion | ⬜ |
 | PR-5 | 3-pass mode | ⬜ |
 | PR-6 | Immersive reader | ⬜ |

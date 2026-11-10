@@ -17,6 +17,29 @@ void chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
   .catch((err: unknown) => console.error('[ImmerseWord] sidePanel behavior failed:', err));
 
+/* Context menu: "Look up '<selection>'" on any selected text (PRD F2/U8). */
+const LOOKUP_MENU_ID = 'iw-lookup-selection';
+
+chrome.runtime.onInstalled.addListener(() => {
+  void chrome.contextMenus.removeAll().then(() => {
+    void chrome.contextMenus.create({
+      id: LOOKUP_MENU_ID,
+      title: 'Look up "%s" with ImmerseWord',
+      contexts: ['selection'],
+    });
+  });
+});
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId !== LOOKUP_MENU_ID || !tab?.id) return;
+  const lemma = (info.selectionText ?? '').trim().toLowerCase().split(/\s+/)[0] ?? '';
+  if (!lemma) return;
+  // The popover that opens in the tab is the user feedback (skill rule 9).
+  void chrome.tabs.sendMessage(tab.id, { type: 'IW_SHOW_LOOKUP', lemma } satisfies IwMessage).catch(
+    (err: unknown) => console.warn('[ImmerseWord] lookup message failed:', err),
+  );
+});
+
 const dictionary = createDictionaryService({
   fetchImpl: (url, init) => fetch(url, init),
   storage: chrome.storage.local,
