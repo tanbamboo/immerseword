@@ -8,10 +8,65 @@
 
 import { tokenize, isAcronym } from '../shared/tokenizer';
 import type { FrequencyIndex } from '../shared/frequency';
-import type { IwSettings, WordStatus } from '../shared/types';
+import type { IwSettings, PageStats, PageWord, WordStatus } from '../shared/types';
 
 /** Visual state of a tagged word (candidate = frequency-flagged, not yet classified). */
 export type TagStatus = 'candidate' | Exclude<WordStatus, 'known' | 'ignored'>;
+
+/**
+ * On-demand page snapshot for the side panel: walks tagged spans plus the
+ * remaining text nodes, returning per-lemma counts and coverage. Pure
+ * function of the DOM — no state kept between calls.
+ */
+export function collectPageData(root: ParentNode): { stats: PageStats; words: PageWord[] } {
+  const byLemma = new Map<string, { status: PageWord['status']; count: number }>();
+  let taggedTokens = 0;
+
+  root.querySelectorAll<HTMLElement>('span.iw-word').forEach((span) => {
+    const lemma = span.dataset.lemma;
+    const status = span.dataset.iwStatus as PageWord['status'];
+    if (!lemma || !status) return;
+    const entry = byLemma.get(lemma);
+    if (entry) {
+      entry.count += 1;
+    } else {
+      byLemma.set(lemma, { status, count: 1 });
+    }
+    taggedTokens += 1;
+  });
+
+  // Untagged tokens: every word outside skip containers and tag spans.
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node: Node): number {
+      const parent = node.parentElement;
+      if (!parent) return NodeFilter.FILTER_REJECT;
+      if (parent.closest(SKIP_SELECTOR)) return NodeFilter.FILTER_REJECT;
+      return /[A-Za-z]{2}/.test(node.nodeValue ?? '')
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_REJECT;
+    },
+  });
+  let commonTokens = 0;
+  let node = walker.nextNode();
+  while (node) {
+    commonTokens += tokenize(node.nodeValue ?? '').filter((t) => !isAcronym(t.text) && t.text.length > 1).length;
+    node = walker.nextNode();
+  }
+
+  const tagged = { candidate: 0, unknown: 0, learning: 0 } as PageStats['tagged'];
+  for (const { status, count } of byLemma.values()) tagged[status] += count;
+
+  const tokensTotal = commonTokens + taggedTokens;
+  const flagged = tagged.candidate + tagged.unknown + tagged.learning;
+  const coveragePct = tokensTotal === 0 ? 100 : Math.round(((tokensTotal - flagged) / tokensTotal) * 100);
+
+  return {
+    stats: { tokensTotal, tagged, coveragePct },
+    words: [...byLemma.entries()]
+      .map(([lemma, { status, count }]) => ({ lemma, status, count }))
+      .sort((a, b) => b.count - a.count || a.lemma.localeCompare(b.lemma)),
+  };
+}
 
 /** Subtrees never tagged: code, editing surfaces, media, our own UI. */
 const SKIP_SELECTOR =
@@ -39,7 +94,13 @@ export function createTagger(options: TaggerOptions) {
   let settings = options.settings;
   let vocab = options.vocab;
   let scanToken = 0;
-  const processed = new WeakSet<Node>();
+  /**
+   * Text nodes already examined. A clearable Set (not WeakSet): untag()
+   * merges text nodes back together via normalize(), and the merged node
+   * must become scannable again — impossible to arrange with a WeakSet.
+   * Pruned opportunistically so SPA churn cannot grow it unboundedly.
+   */
+  const processed = new Set<Text>();
 
   function classify(text: string): { lemma: string; status: TagStatus } | null {
     if (isAcronym(text)) return null;
@@ -54,12 +115,19 @@ export function createTagger(options: TaggerOptions) {
 
   /** Text nodes under `root`, skipping banned subtrees and processed nodes. */
   function collectTextNodes(root: ParentNode): Text[] {
+    // Opportunistic pruning: drop entries for nodes the page has removed so
+    // SPA churn cannot grow the set without bound.
+    if (processed.size > 2_000) {
+      for (const node of processed) {
+        if (!node.isConnected) processed.delete(node);
+      }
+    }
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode(node: Node): number {
         const parent = node.parentElement;
         if (!parent) return NodeFilter.FILTER_REJECT;
         if (parent.closest(SKIP_SELECTOR)) return NodeFilter.FILTER_REJECT;
-        if (processed.has(node)) return NodeFilter.FILTER_REJECT;
+        if (processed.has(node as Text)) return NodeFilter.FILTER_REJECT;
         const value = node.nodeValue ?? '';
         if (!/[A-Za-z]{2}/.test(value)) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
@@ -138,6 +206,9 @@ export function createTagger(options: TaggerOptions) {
       span.remove();
       parent.normalize();
     });
+    // normalize() merged the restored fragments into nodes the scan has
+    // already seen — clear tracking so a rescan can re-classify them.
+    processed.clear();
   }
 
   /** Applies new settings; re-classification requires unwrap + rescan. */

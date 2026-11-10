@@ -22,7 +22,31 @@ export type IwMessage =
       entry: DictionaryEntry | null;
       source: 'core' | 'api' | 'cache' | 'none';
     }
-  | { type: 'IW_SHOW_LOOKUP'; lemma: string };
+  | { type: 'IW_SHOW_LOOKUP'; lemma: string }
+  | { type: 'GET_PAGE_DATA' }
+  | {
+      type: 'PAGE_DATA';
+      stats: PageStats;
+      words: PageWord[];
+      url: string;
+    };
+
+/** Snapshot of tagging state on the current page (GET_PAGE_DATA response). */
+export interface PageStats {
+  /** All English word tokens on the page (tagged + untagged). */
+  tokensTotal: number;
+  /** Tagged words, by visual status. */
+  tagged: { candidate: number; unknown: number; learning: number };
+  /** Share of tokens not flagged as unknown/candidate, 0–100. */
+  coveragePct: number;
+}
+
+/** One lemma as it appears on the page (for the panel's word list). */
+export interface PageWord {
+  lemma: string;
+  status: 'candidate' | 'unknown' | 'learning';
+  count: number;
+}
 
 /** Normalized monolingual dictionary entry (bundled core and API both map to this). */
 export interface DictionaryEntry {

@@ -6,7 +6,7 @@
  * changes. Pass rendering (PR-5) layers on top of the tagger attributes.
  */
 
-import { createTagger } from './tagger';
+import { createTagger, collectPageData } from './tagger';
 import { createPopover } from './popover';
 import { createFrequencyIndex } from '../shared/frequency';
 import { createLemmatizer } from '../shared/lemmatizer';
@@ -163,6 +163,28 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
     if (span) span.click();
     sendResponse({ shown: !!span });
     return false;
+  }
+  if (msg?.type === 'GET_PAGE_DATA') {
+    // Snapshot after any in-flight scan settles: poll briefly for spans.
+    (async () => {
+      for (let i = 0; i < 20; i++) {
+        const data = collectPageData(document.body);
+        // Wait until tagging has produced at least one span OR the page has
+        // been fully processed (heuristic: two identical samples in a row).
+        if (data.stats.tokensTotal > 0 && (data.words.length > 0 || i > 6)) {
+          sendResponse({ type: 'PAGE_DATA', stats: data.stats, words: data.words, url: location.href });
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 150));
+      }
+      sendResponse({
+        type: 'PAGE_DATA',
+        stats: collectPageData(document.body).stats,
+        words: [],
+        url: location.href,
+      });
+    })();
+    return true; // async response
   }
   return false;
 });

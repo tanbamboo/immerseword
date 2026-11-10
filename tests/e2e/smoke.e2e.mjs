@@ -56,9 +56,15 @@ export const tests = [
         // Make the fixture tab active again, then re-run detection in the
         // panel via its explicit hook (opening the panel made IT active).
         await page.bringToFront();
+        await panel.waitForFunction(() => typeof window.__iwRefresh === 'function', {
+          timeout: 5_000,
+        });
         await panel.evaluate(() => window.__iwRefresh());
+        // With a live content script, the page-data card must appear.
         await panel.waitForFunction(
-          () => document.querySelector('#iw-status')?.textContent?.includes('ready'),
+          () =>
+            document.querySelector('#iw-page-card') &&
+            !document.querySelector('#iw-page-card').hidden,
           { timeout: 5_000 },
         );
         panelWatcher.assertClean();
