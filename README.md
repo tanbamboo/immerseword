@@ -21,7 +21,7 @@ language-learning session:
 | PR-3 | Popover & vocabulary | ✅ merged |
 | PR-4 | Side panel reading companion | ✅ merged |
 | PR-5 | 3-pass mode | ✅ merged |
-| PR-6 | Immersive reader | ⬜ |
+| PR-6 | Immersive reader | ✅ merged |
 | PR-7 | Options & release readiness | ⬜ |
 
 ## Develop

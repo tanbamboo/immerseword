@@ -9,6 +9,7 @@
 import { createTagger, collectPageData } from './tagger';
 import { createPopover } from './popover';
 import { createPassPill } from './pill';
+import { createReader, canRead, DEFAULT_READER_PREFS, type ReaderPrefs } from './reader';
 import { createFrequencyIndex } from '../shared/frequency';
 import { createLemmatizer } from '../shared/lemmatizer';
 import { getSettings, type SyncStorageLike } from '../shared/settings';
@@ -29,6 +30,7 @@ let tagger: ReturnType<typeof createTagger> | null = null;
 let vocab: VocabStore | null = null;
 let currentSettings: IwSettings = DEFAULT_SETTINGS;
 let rescanTimer: ReturnType<typeof setTimeout> | null = null;
+let readerToggleRef: (() => void) | null = null;
 
 async function loadFrequencyWords(): Promise<string[]> {
   try {
@@ -38,6 +40,25 @@ async function loadFrequencyWords(): Promise<string[]> {
   } catch (err) {
     console.error('[ImmerseWord] frequency data failed to load:', err);
     return [];
+  }
+}
+
+const READER_PREFS_KEY = 'iw:readerPrefs';
+
+async function loadReaderPrefs(): Promise<ReaderPrefs> {
+  try {
+    const found = await chrome.storage.sync.get([READER_PREFS_KEY]);
+    return { ...DEFAULT_READER_PREFS, ...(found[READER_PREFS_KEY as string] as Partial<ReaderPrefs> ?? {}) };
+  } catch {
+    return { ...DEFAULT_READER_PREFS };
+  }
+}
+
+async function saveReaderPrefs(prefs: ReaderPrefs): Promise<void> {
+  try {
+    await chrome.storage.sync.set({ [READER_PREFS_KEY]: prefs });
+  } catch {
+    // Prefs persistence is best-effort.
   }
 }
 
@@ -81,6 +102,30 @@ async function init(): Promise<void> {
     },
   });
 
+  // Immersive reader (ADR-0006): on-demand overlay, tagging re-scans the
+  // extracted article inside the shadow root.
+  const readerPrefs = await loadReaderPrefs();
+  const reader = createReader({
+    prefs: readerPrefs,
+    onPrefsChange: (next) => void saveReaderPrefs(next),
+    onArticleReady: (articleEl) => {
+      if (currentSettings.taggingEnabled) void tagger?.scan(articleEl);
+    },
+  });
+  readerToggleRef = () => reader.toggle();
+
+  if (canRead(document)) {
+    const launcher = document.createElement('button');
+    launcher.id = 'iw-reader-launch';
+    launcher.className = 'iw-ui';
+    launcher.type = 'button';
+    launcher.title = 'Immerse — distraction-free reading view';
+    launcher.setAttribute('aria-label', 'Open immersive reader');
+    launcher.textContent = '❋ Immerse';
+    launcher.addEventListener('click', () => reader.open());
+    document.documentElement.append(launcher);
+  }
+
   // 3-pass session pill (ADR-0005).
   passPill = createPassPill({
     transition: async (action) => {
@@ -94,11 +139,14 @@ async function init(): Promise<void> {
     })
     .catch(() => undefined);
 
-  // Click delegation: any tagged word opens the popover.
+  // Click delegation: any tagged word opens the popover. composedPath()[0]
+  // is the real inner target — event.target is retargeted to the host when
+  // the click originates inside the reader's shadow root.
   document.addEventListener('click', (event) => {
     if (!currentSettings.taggingEnabled) return;
-    const target = event.target as HTMLElement | null;
-    const span = target?.closest<HTMLElement>('span.iw-word');
+    const path = event.composedPath();
+    const target = (path[0] ?? event.target) as HTMLElement | null;
+    const span = target?.closest?.('span.iw-word') as HTMLElement | null;
     if (span?.dataset.lemma) {
       event.preventDefault();
       event.stopPropagation();
@@ -219,6 +267,11 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
   }
   if (msg?.type === 'SESSION_UPDATED') {
     applySession(msg.session ?? null);
+    return false;
+  }
+  if (msg?.type === 'READER_TOGGLE') {
+    readerToggleRef?.();
+    sendResponse({ ok: true });
     return false;
   }
   if (msg?.type === 'GET_PAGE_DATA') {

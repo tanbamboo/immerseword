@@ -323,6 +323,15 @@ async function init(): Promise<void> {
     });
   });
 
+  el('#iw-reader-btn').addEventListener('click', async () => {
+    if (activeTabId === null) return;
+    try {
+      await chrome.tabs.sendMessage(activeTabId, { type: 'READER_TOGGLE' } satisfies IwMessage);
+    } catch {
+      // Reader unavailable on this page (no content script / not readable).
+    }
+  });
+
   bindSettings();
   bindSession();
   await refreshSettings();

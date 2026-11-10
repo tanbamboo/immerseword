@@ -28,17 +28,28 @@ chrome.runtime.onInstalled.addListener(() => {
       title: 'Look up "%s" with ImmerseWord',
       contexts: ['selection'],
     });
+    void chrome.contextMenus.create({
+      id: 'iw-reader-open',
+      title: 'Immerse this page (reader mode)',
+      contexts: ['page'],
+    });
   });
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId !== LOOKUP_MENU_ID || !tab?.id) return;
-  const lemma = (info.selectionText ?? '').trim().toLowerCase().split(/\s+/)[0] ?? '';
-  if (!lemma) return;
-  // The popover that opens in the tab is the user feedback (skill rule 9).
-  void chrome.tabs.sendMessage(tab.id, { type: 'IW_SHOW_LOOKUP', lemma } satisfies IwMessage).catch(
-    (err: unknown) => console.warn('[ImmerseWord] lookup message failed:', err),
-  );
+  if (!tab?.id) return;
+  // Both actions show immediate in-page feedback (popover / reader overlay).
+  if (info.menuItemId === LOOKUP_MENU_ID) {
+    const lemma = (info.selectionText ?? '').trim().toLowerCase().split(/\s+/)[0] ?? '';
+    if (!lemma) return;
+    void chrome.tabs
+      .sendMessage(tab.id, { type: 'IW_SHOW_LOOKUP', lemma } satisfies IwMessage)
+      .catch((err: unknown) => console.warn('[ImmerseWord] lookup message failed:', err));
+  } else if (info.menuItemId === 'iw-reader-open') {
+    void chrome.tabs
+      .sendMessage(tab.id, { type: 'READER_TOGGLE' } satisfies IwMessage)
+      .catch((err: unknown) => console.warn('[ImmerseWord] reader message failed:', err));
+  }
 });
 
 /* ── services ──────────────────────────────────────────────────────────── */
