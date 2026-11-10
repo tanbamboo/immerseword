@@ -93,12 +93,16 @@ export function createTagger(options: TaggerOptions) {
   const { batchSize = 20 } = options;
   let settings = options.settings;
   let vocab = options.vocab;
-  let scanToken = 0;
+  /**
+   * Scan invalidation is PER ROOT: a rescan of the page body must not abort
+   * an in-flight scan of the reader's shadow-root article (they coexist).
+   */
+  const scanTokens = new WeakMap<ParentNode, number>();
   /**
    * Text nodes already examined. A clearable Set (not WeakSet): untag()
    * merges text nodes back together via normalize(), and the merged node
    * must become scannable again — impossible to arrange with a WeakSet.
-   * Pruned opportunistically so SPA churn cannot grow it unboundedly.
+   * Pruned opportunistically so SPA churn cannot grow it without bound.
    */
   const processed = new Set<Text>();
 
@@ -175,17 +179,19 @@ export function createTagger(options: TaggerOptions) {
   }
 
   async function scan(root: ParentNode): Promise<number> {
-    const token = ++scanToken;
+    const token = (scanTokens.get(root) ?? 0) + 1;
+    scanTokens.set(root, token);
+    const currentToken = () => scanTokens.get(root);
     const nodes = collectTextNodes(root);
     let total = 0;
 
     for (let i = 0; i < nodes.length; i += batchSize) {
-      if (token !== scanToken) return total; // superseded by a newer scan
+      if (token !== currentToken()) return total; // superseded by a newer scan of THIS root
       const batch = nodes.slice(i, i + batchSize);
       await new Promise<void>((resolve) => {
         requestAnimationFrame(() => {
           for (const node of batch) {
-            if (token !== scanToken) return resolve();
+            if (token !== currentToken()) return resolve();
             total += wrapNode(node);
           }
           resolve();
@@ -198,7 +204,7 @@ export function createTagger(options: TaggerOptions) {
 
   /** Removes every tag span under `root`, restoring pristine text nodes. */
   function untag(root: ParentNode = document.body): void {
-    scanToken++; // cancel in-flight batches
+    scanTokens.set(root, (scanTokens.get(root) ?? 0) + 1); // cancel in-flight batches
     root.querySelectorAll('span.iw-word').forEach((span) => {
       const parent = span.parentNode;
       if (!parent) return;

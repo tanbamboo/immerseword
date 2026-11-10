@@ -35,7 +35,8 @@ export type IwMessage =
   | { type: 'SESSION_GET'; tabId?: number }
   | { type: 'SESSION_TRANSITION'; action: 'next' | 'reset'; tabId?: number }
   | { type: 'SESSION_WORD_CLASSIFIED'; lemma: string; status: WordStatus }
-  | { type: 'SESSION_UPDATED'; session: IwSession | null };
+  | { type: 'SESSION_UPDATED'; session: IwSession | null }
+  | { type: 'READER_TOGGLE' };
 
 /** Reading pass within a session (ADR-0005). Strictly linear: 1 → 2 → 3 → done. */
 export type IwPass = 1 | 2 | 3 | 'done';
