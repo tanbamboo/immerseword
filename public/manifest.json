@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "ImmerseWord",
+  "version": "0.1.0",
+  "description": "Tag unknown words, read English with monolingual definitions, and master pages with the 3-pass reading method.",
+  "minimum_chrome_version": "120",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "ImmerseWord — reading companion",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content/content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
+  },
+  "permissions": [
+    "storage",
+    "tabs",
+    "sidePanel",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqp5hFPbvHedZCwL7wUv0U5mr09K9xna63zbk4YKDBMxVrxF5+N049qzFItahwmQed7DUiifi3AOQvYfcary/Yl+TBjwKlYw/M9fzUnRG/YEO1NVxRLGOI7YPQYrUPaMZb2fdHN0g0QXs3zhHgblUwp5WIW8S8IKM5roClOTR0XUiQ/u6xAgsoNVIm8jrOijRmVLTVa7tNcfy/2q3dHy5Az/RSiPP4ICoOYLVtn1edbIRAAXF3R+rL6pFHhDD/s3nibEJr+dPyUMzXGFeMZi6jgMRXzkgsknXwWVbfBCctvmdZ2+JG7xuCCVRoqt9o4b6xwy1afDfJZ7gHZ4GmHG9SQIDAQAB"
+}
