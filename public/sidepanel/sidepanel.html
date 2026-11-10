@@ -76,14 +76,29 @@
       <p class="iw-hint-text">Full settings & data export live on the options page (coming soon).</p>
     </section>
 
-    <section class="iw-card iw-hint">
-      <h2>The 3-pass method</h2>
-      <ol>
-        <li><strong>Gist</strong> — read for overall meaning, don't stop.</li>
-        <li><strong>Study</strong> — tap unknown words, read English definitions.</li>
-        <li><strong>Fluency</strong> — reread at full speed.</li>
-      </ol>
-      <p class="iw-hint-text">Guided 3-pass sessions arrive in the next update.</p>
+    <section class="iw-card" id="iw-session-card">
+      <h2>3-pass reading</h2>
+      <div id="iw-session-idle">
+        <ol class="iw-passes">
+          <li><strong>Gist</strong> — read for overall meaning, don't stop.</li>
+          <li><strong>Study</strong> — tap unknown words, read English definitions.</li>
+          <li><strong>Fluency</strong> — reread at full speed.</li>
+        </ol>
+        <button class="iw-primary" id="iw-session-start">Start 3-pass session</button>
+      </div>
+      <div id="iw-session-active" hidden>
+        <div class="iw-session-stepper">
+          <span class="iw-step" data-step="1">1 Gist</span>
+          <span class="iw-step" data-step="2">2 Study</span>
+          <span class="iw-step" data-step="3">3 Fluency</span>
+        </div>
+        <p class="iw-hint-text" id="iw-session-hint"></p>
+        <div class="iw-session-actions">
+          <button class="iw-primary" id="iw-session-next">Next pass →</button>
+          <button class="iw-ghost" id="iw-session-reset">End</button>
+        </div>
+        <div id="iw-session-summary" hidden></div>
+      </div>
     </section>
   </main>
   <script src="main.js"></script>
