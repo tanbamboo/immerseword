@@ -29,7 +29,34 @@ export type IwMessage =
       stats: PageStats;
       words: PageWord[];
       url: string;
-    };
+    }
+  /* ── 3-pass sessions (ADR-0005) ── */
+  | { type: 'SESSION_START'; url: string; tabId?: number }
+  | { type: 'SESSION_GET'; tabId?: number }
+  | { type: 'SESSION_TRANSITION'; action: 'next' | 'reset'; tabId?: number }
+  | { type: 'SESSION_WORD_CLASSIFIED'; lemma: string; status: WordStatus }
+  | { type: 'SESSION_UPDATED'; session: IwSession | null };
+
+/** Reading pass within a session (ADR-0005). Strictly linear: 1 → 2 → 3 → done. */
+export type IwPass = 1 | 2 | 3 | 'done';
+
+export interface IwPassInterval {
+  pass: IwPass;
+  enteredAt: number;
+  exitedAt?: number;
+}
+
+export interface IwSession {
+  tabId: number;
+  url: string;
+  startedAt: number;
+  pass: IwPass;
+  history: IwPassInterval[];
+  stats: {
+    lookups: number;
+    classified: Record<WordStatus, number>;
+  };
+}
 
 /** Snapshot of tagging state on the current page (GET_PAGE_DATA response). */
 export interface PageStats {

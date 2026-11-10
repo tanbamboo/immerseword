@@ -52,3 +52,41 @@ span.iw-word[data-iw-status="known"],
 span.iw-word[data-iw-status="ignored"] {
   text-decoration: none;
 }
+
+/*
+ * 3-pass rendering (ADR-0005): the pass lives on <html data-iw-pass="N">.
+ *   Pass 1 (Gist)    — quiet page: candidates unmarked; unknown/learning
+ *                      reduced to faint dots (tap-to-flag still works).
+ *   Pass 2 (Study)   — full marks (the defaults above).
+ *   Pass 3 (Fluency) — candidates unmarked; unknown/learning faint dots.
+ * With settings.pass1ShowMarks, Pass 1 candidates show faint dots too
+ * (the <html> element also gets data-iw-p1-marks, written by the content
+ * script from settings).
+ */
+
+html[data-iw-pass="1"] span.iw-word[data-iw-status="candidate"],
+html[data-iw-pass="3"] span.iw-word[data-iw-status="candidate"],
+html[data-iw-pass="done"] span.iw-word[data-iw-status="candidate"] {
+  text-decoration: none;
+}
+
+html[data-iw-pass="1"] span.iw-word[data-iw-status="unknown"],
+html[data-iw-pass="1"] span.iw-word[data-iw-status="learning"],
+html[data-iw-pass="3"] span.iw-word[data-iw-status="unknown"],
+html[data-iw-pass="3"] span.iw-word[data-iw-status="learning"] {
+  text-decoration: underline dotted;
+  text-decoration-color: rgb(120 113 108 / 0.45);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  text-underline-position: auto;
+}
+
+/* pass1ShowMarks: candidates faintly visible during Pass 1. */
+html[data-iw-pass="1"][data-iw-p1-marks] span.iw-word[data-iw-status="candidate"] {
+  text-decoration: underline dotted;
+  text-decoration-color: rgb(120 113 108 / 0.3);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+/* Pass 1 & 3 keep words clickable: cursor stays pointer via .iw-word base rule. */

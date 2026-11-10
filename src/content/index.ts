@@ -8,11 +8,18 @@
 
 import { createTagger, collectPageData } from './tagger';
 import { createPopover } from './popover';
+import { createPassPill } from './pill';
 import { createFrequencyIndex } from '../shared/frequency';
 import { createLemmatizer } from '../shared/lemmatizer';
 import { getSettings, type SyncStorageLike } from '../shared/settings';
 import { createVocabStore, type VocabStore } from '../shared/vocab';
-import { DEFAULT_SETTINGS, type IwMessage, type IwSettings, type WordStatus } from '../shared/types';
+import {
+  DEFAULT_SETTINGS,
+  type IwMessage,
+  type IwSession,
+  type IwSettings,
+  type WordStatus,
+} from '../shared/types';
 
 document.documentElement.dataset.iwReady = '1';
 
@@ -68,8 +75,24 @@ async function init(): Promise<void> {
     onStatusChange: (lemma, status) => {
       statusMap.set(lemma, status);
       tagger?.refreshStatus(lemma, status);
+      void chrome.runtime
+        .sendMessage({ type: 'SESSION_WORD_CLASSIFIED', lemma, status } satisfies IwMessage)
+        .catch(() => undefined);
     },
   });
+
+  // 3-pass session pill (ADR-0005).
+  passPill = createPassPill({
+    transition: async (action) => {
+      await chrome.runtime.sendMessage({ type: 'SESSION_TRANSITION', action } satisfies IwMessage);
+    },
+  });
+  void chrome.runtime
+    .sendMessage({ type: 'SESSION_GET' } satisfies IwMessage)
+    .then((session) => {
+      if (session) applySession(session as IwSession);
+    })
+    .catch(() => undefined);
 
   // Click delegation: any tagged word opens the popover.
   document.addEventListener('click', (event) => {
@@ -86,6 +109,7 @@ async function init(): Promise<void> {
   if (currentSettings.taggingEnabled) {
     void tagger.scan(document.body);
   }
+  applyP1MarksSetting(currentSettings);
 
   watchMutations();
 }
@@ -117,12 +141,21 @@ function watchMutations(): void {
 
 /* ── settings changes (from options page or side panel) ────────────────── */
 
+function applyP1MarksSetting(settings: IwSettings): void {
+  if (settings.pass1ShowMarks) {
+    document.documentElement.dataset.iwP1Marks = '1';
+  } else {
+    delete document.documentElement.dataset.iwP1Marks;
+  }
+}
+
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'sync' || !changes['iw:settings'] || !tagger) return;
   const next = { ...DEFAULT_SETTINGS, ...(changes['iw:settings'].newValue as Partial<IwSettings>) };
   const levelChanged = next.level !== currentSettings.level;
   currentSettings = next;
   tagger.applySettings(next);
+  applyP1MarksSetting(next);
   if (levelChanged) {
     tagger.untag();
     if (next.taggingEnabled) void tagger.scan(document.body);
@@ -138,9 +171,29 @@ chrome.storage.onChanged.addListener((changes, area) => {
   for (const lemma of new Set([...Object.keys(prev), ...Object.keys(next)])) {
     if (prev[lemma]?.status !== next[lemma]?.status) {
       tagger.refreshStatus(lemma, next[lemma]?.status ?? 'candidate');
+      void chrome.runtime
+        .sendMessage({
+          type: 'SESSION_WORD_CLASSIFIED',
+          lemma,
+          status: next[lemma]?.status ?? 'unknown',
+        } satisfies IwMessage)
+        .catch(() => undefined);
     }
   }
 });
+
+/* ── 3-pass session rendering (ADR-0005) ───────────────────────────────── */
+
+let passPill: ReturnType<typeof createPassPill> | null = null;
+
+function applySession(session: IwSession | null): void {
+  if (session) {
+    document.documentElement.dataset.iwPass = String(session.pass);
+  } else {
+    delete document.documentElement.dataset.iwPass;
+  }
+  passPill?.update(session);
+}
 
 /* ── messaging ─────────────────────────────────────────────────────────── */
 
@@ -162,6 +215,10 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
     // Popover opens via the synthetic click path by re-dispatching on the span.
     if (span) span.click();
     sendResponse({ shown: !!span });
+    return false;
+  }
+  if (msg?.type === 'SESSION_UPDATED') {
+    applySession(msg.session ?? null);
     return false;
   }
   if (msg?.type === 'GET_PAGE_DATA') {

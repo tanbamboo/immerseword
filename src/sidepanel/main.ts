@@ -11,7 +11,15 @@
 
 import { getSettings, setSettings, type SyncStorageLike } from '../shared/settings';
 import { createVocabStore, type VocabEntry } from '../shared/vocab';
-import type { IwMessage, IwSettings, LevelBand, PageStats, PageWord, WordStatus } from '../shared/types';
+import type {
+  IwMessage,
+  IwSession,
+  IwSettings,
+  LevelBand,
+  PageStats,
+  PageWord,
+  WordStatus,
+} from '../shared/types';
 
 const vocab = createVocabStore(chrome.storage.local);
 
@@ -179,6 +187,111 @@ function bindSettings(): void {
   });
 }
 
+/* ── 3-pass session card (ADR-0005) ────────────────────────────────────── */
+
+const PASS_HINTS: Record<string, string> = {
+  '1': 'Read for the overall meaning. Don’t stop for words.',
+  '2': 'Tap words you don’t know and classify them honestly.',
+  '3': 'Reread at full speed — enjoy how much clearer it feels.',
+};
+
+async function sessionApi<T>(message: IwMessage): Promise<T | null> {
+  try {
+    return (await chrome.runtime.sendMessage(message)) as T;
+  } catch {
+    return null;
+  }
+}
+
+function fmtDuration(ms: number): string {
+  const s = Math.round(ms / 1000);
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
+function renderSession(session: IwSession | null): void {
+  const idle = el('#iw-session-idle');
+  const active = el('#iw-session-active');
+  if (!session) {
+    idle.hidden = false;
+    active.hidden = true;
+    return;
+  }
+  idle.hidden = true;
+  active.hidden = false;
+
+  const passNum = session.pass === 'done' ? 4 : Number(session.pass);
+  document.querySelectorAll('#iw-session-active .iw-step').forEach((step) => {
+    const n = Number((step as HTMLElement).dataset.step);
+    step.classList.toggle('done', n < passNum);
+    step.classList.toggle('now', n === passNum);
+  });
+  el('#iw-session-hint').textContent =
+    session.pass === 'done' ? 'Session complete — well read.' : (PASS_HINTS[String(session.pass)] ?? '');
+
+  const nextBtn = el('#iw-session-next') as HTMLButtonElement;
+  nextBtn.textContent = session.pass === 3 ? 'Finish session ✓' : 'Next pass →';
+  nextBtn.disabled = session.pass === 'done';
+
+  const summary = el('#iw-session-summary');
+  if (session.pass === 'done') {
+    summary.hidden = false;
+    summary.innerHTML = '';
+    const table = document.createElement('table');
+    table.className = 'iw-summary-table';
+    const totalMs = Date.now() - session.startedAt;
+    const rows: Array<[string, string]> = [
+      ['Total time', fmtDuration(totalMs)],
+      ['Lookups', String(session.stats.lookups)],
+      ['Known', String(session.stats.classified.known)],
+      ['Learning', String(session.stats.classified.learning)],
+      ['Unknown', String(session.stats.classified.unknown)],
+    ];
+    for (const [label, value] of rows) {
+      const tr = document.createElement('tr');
+      const td1 = document.createElement('td');
+      td1.textContent = label;
+      const td2 = document.createElement('td');
+      td2.className = 'num';
+      td2.textContent = value;
+      tr.append(td1, td2);
+      table.append(tr);
+    }
+    summary.append(table);
+  } else {
+    summary.hidden = true;
+  }
+}
+
+async function refreshSession(): Promise<void> {
+  const tabId = activeTabId;
+  if (tabId === null) {
+    renderSession(null);
+    return;
+  }
+  const session = await sessionApi<IwSession | null>({ type: 'SESSION_GET', tabId });
+  renderSession(session);
+}
+
+function bindSession(): void {
+  el('#iw-session-start').addEventListener('click', async () => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+    // Start on the active tab; content script reacts to SESSION_UPDATED.
+    await sessionApi({ type: 'SESSION_START', url: tab.url ?? '', tabId: tab.id });
+    await refreshSession();
+  });
+  el('#iw-session-next').addEventListener('click', async () => {
+    if (activeTabId === null) return;
+    await sessionApi({ type: 'SESSION_TRANSITION', action: 'next', tabId: activeTabId });
+    await refreshSession();
+  });
+  el('#iw-session-reset').addEventListener('click', async () => {
+    if (activeTabId === null) return;
+    await sessionApi({ type: 'SESSION_TRANSITION', action: 'reset', tabId: activeTabId });
+    await refreshSession();
+  });
+}
+
 /* ── lifecycle ─────────────────────────────────────────────────────────── */
 
 async function refreshTab(): Promise<void> {
@@ -211,19 +324,31 @@ async function init(): Promise<void> {
   });
 
   bindSettings();
+  bindSession();
   await refreshSettings();
   await refreshTab();
   await refreshVocab();
+  await refreshSession();
 
   void chrome.runtime.sendMessage({ type: 'PING' }).catch(() => undefined); // wake the SW
 
-  chrome.tabs.onActivated.addListener(() => void refreshTab());
+  chrome.tabs.onActivated.addListener(() => {
+    void refreshTab();
+    void refreshSession();
+  });
+
+  // Exposed for E2E tests: deterministic full re-detection.
+  (window as unknown as { __iwRefresh: () => Promise<void> }).__iwRefresh = async () => {
+    await refreshTab();
+    await refreshSession();
+  };
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && changes['iw:vocab']) {
       void refreshVocab();
       void refreshPageData();
     }
     if (area === 'sync' && changes['iw:settings']) void refreshSettings();
+    if (area === 'session') void refreshSession(); // session transitions update the card
   });
 }
 
