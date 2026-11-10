@@ -1,0 +1,26 @@
+{
+  "name": "immerseword",
+  "description": "Chrome extension for immersive English reading: unknown-word tagging, monolingual dictionary, 3-pass reading method.",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "gen:icons": "node scripts/gen-icons.mjs",
+    "build:data": "node scripts/build-data.mjs",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:e2e": "npm run build && node tests/e2e/run.mjs"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.3.7",
+    "happy-dom": "^21.0.4",
+    "puppeteer": "^25.16.0",
+    "sharp": "^0.35.5",
+    "typescript": "^7.0.2",
+    "vite": "^6.4.6",
+    "vitest": "^5.1.0"
+  }
+}

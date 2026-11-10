@@ -13,6 +13,9 @@ tests/fixtures/.server-port
 .env
 .env.*
 
+# Dev signing key (private); the manifest "key" (public half) is committed
+immerseword-dev.pem
+
 # OS
 Thumbs.db
 .DS_Store
@@ -20,3 +23,6 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# ZCode session artifacts
+.zcode/
