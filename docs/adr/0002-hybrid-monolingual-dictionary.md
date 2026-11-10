@@ -16,9 +16,12 @@ dictionaryapi.dev is free/keyless but network-dependent and rate-limit-unspecifi
 
 1. **`dict-core.json` (bundled, committed to repo)** — generated at build time from
    WordNet 3.x database files: for each of the top ~15k lemmas (by the frequency list),
-   the shortest gloss per major POS, POS tag, and — where cheap — one WordNet example.
+   the **first-sense** gloss per major POS (WordNet orders senses by frequency of use, so
+   sense 1 is the most common meaning), POS tag, and — where cheap — one WordNet example.
    ~1.5–3 MB JSON. Loaded by the SW on demand and kept in memory of the SW instance
-   (reloadable; not persisted state).
+   (reloadable; not persisted state). *(Amended 2026-11-10: originally "shortest gloss",
+   which picked terse-but-rare senses like beautiful → "of weather"; first-sense ordering
+   is the correct default.)*
 2. **Free Dictionary API** (`https://api.dictionaryapi.dev/api/v2/entries/en/<word>`) for
    anything missing — full entries: phonetics, senses, examples. Normalized to our
    internal `DictionaryEntry` shape.

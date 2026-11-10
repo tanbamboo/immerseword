@@ -16,7 +16,7 @@ language-learning session:
 |----|-------|-------|
 | Phase A | PRD + ADRs | ✅ merged |
 | PR-0 | Scaffold, toolchain, smoke E2E | ✅ merged |
-| PR-1 | Language core & dictionary data | ⬜ |
+| PR-1 | Language core & dictionary data | ✅ merged |
 | PR-2 | Word tagging engine | ⬜ |
 | PR-3 | Popover & vocabulary | ⬜ |
 | PR-4 | Side panel reading companion | ⬜ |
