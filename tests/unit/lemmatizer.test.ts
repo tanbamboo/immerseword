@@ -71,8 +71,12 @@ describe('lemmatizer — case handling', () => {
 });
 
 describe('lemmatizer — without validation set (stateless)', () => {
-  it('still resolves irregulars and simple plurals', () => {
+  it('resolves irregulars and conservative fallbacks only', () => {
     expect(lemmatize('went')).toBe('go');
-    expect(lemmatize('houses')).toBe('house'); // s + e, unvalidated first wins
+    expect(lemmatize('cacophonies')).toBe('cacophony'); // ies fallback
+    expect(lemmatize('glistened')).toBe('glisten'); // ed fallback
+    // No lexicon → aggressive rules stay off: agentive/noun endings intact.
+    expect(lemmatize('gossamer')).toBe('gossamer');
+    expect(lemmatize('houses')).toBe('houses'); // bare -s excluded from fallbacks
   });
 });

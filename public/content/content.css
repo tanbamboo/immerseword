@@ -1,0 +1,54 @@
+/*
+ * ImmerseWord word-tag styles (ADR-0004 §5).
+ * Class-scoped + custom properties only; text-decoration-based marks keep
+ * host-page layout untouched. All rules opt out of inheritance surprises
+ * with explicit, minimal resets on the spans themselves.
+ */
+
+span.iw-word {
+  cursor: pointer;
+  /* Never perturb host layout/typography: */
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  text-shadow: none;
+  background: transparent;
+  transition: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Frequency-flagged but not yet classified by the learner. */
+span.iw-word[data-iw-status="candidate"] {
+  text-decoration: underline dotted;
+  text-decoration-color: var(--iw-cand-color, #b45309);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+/* Learner-classified statuses (introduced with the popover in PR-3). */
+span.iw-word[data-iw-status="unknown"] {
+  text-decoration: underline;
+  text-decoration-color: var(--iw-unknown-color, #d97706);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  text-underline-position: under;
+}
+
+span.iw-word[data-iw-status="learning"] {
+  text-decoration: underline;
+  text-decoration-color: var(--iw-learning-color, #0284c7);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  text-underline-position: under;
+}
+
+/* Known/ignored: no visual mark at all. */
+span.iw-word[data-iw-status="known"],
+span.iw-word[data-iw-status="ignored"] {
+  text-decoration: none;
+}

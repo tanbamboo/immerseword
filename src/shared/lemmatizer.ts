@@ -147,6 +147,23 @@ const SUFFIX_RULES: Array<{ suffix: RegExp; make: (stem: string) => string[] }> 
   { suffix: /s$/, make: (s) => [s, s + 'e'] },
 ];
 
+/**
+ * Conservative fallback rules for rare (unlisted) words — high-precision
+ * inflectional suffixes only. A bare -s is deliberately excluded: rare-word
+ * plurals ("petrichors") are rarer than wrong stems, and noun endings like
+ * -us/-er/-est ("susurrus", "gossamer", "forest") must never be stripped.
+ */
+const FALLBACK_RULES: Array<{
+  suffix: RegExp;
+  guard: (word: string) => boolean;
+  make: (stem: string) => string[];
+}> = [
+  { suffix: /ies$/, guard: (w) => w.length >= 6, make: (s) => [s + 'y'] },
+  { suffix: /ied$/, guard: (w) => w.length >= 6, make: (s) => [s + 'y'] },
+  { suffix: /ing$/, guard: (w) => w.length >= 6, make: (s) => [s, s + 'e', s.slice(0, -1)] },
+  { suffix: /ed$/, guard: (w) => w.length >= 6, make: (s) => [s, s.slice(0, -1), s + 'e'] },
+];
+
 export interface LemmatizerOptions {
   /** Known-lemma set used to validate rule outputs (e.g., frequency list). */
   knownLemmas?: ReadonlySet<string>;
@@ -155,7 +172,10 @@ export interface LemmatizerOptions {
 export function createLemmatizer(options: LemmatizerOptions = {}) {
   const known = options.knownLemmas;
 
-  const valid = (form: string): boolean => (known ? known.has(form) : true);
+  // Pass-1 rules only fire on lexicon validation; without a lexicon, only
+  // the conservative fallbacks below apply (agentive/ambiguous suffixes
+  // would otherwise mangle rare words like "gossamer").
+  const valid = (form: string): boolean => (known ? known.has(form) : false);
 
   return {
     /** Best-effort lemma for a surface form. */
@@ -166,36 +186,42 @@ export function createLemmatizer(options: LemmatizerOptions = {}) {
       const irregular = IRREGULAR[word];
       if (irregular) return irregular;
 
-      // A surface form that is itself a known lemma (e.g., "running" as a
-      // noun, "sets" when "sets" is listed) keeps its own rank first; the
-      // classifier prefers surface rank via rankOf, so here we only fall
-      // through to rules when the surface is not a known lemma.
-      if (known?.has(word)) {
-        // Still try rules first: "studies" may be known AND have lemma
-        // "study" known — the lemma unifies its inflections' statuses.
-        for (const rule of SUFFIX_RULES) {
-          if (rule.suffix.test(word)) {
-            const stem = word.replace(rule.suffix, '');
-            for (const candidate of rule.make(stem)) {
-              if (valid(candidate) && candidate !== word) return candidate;
-            }
-          }
-        }
-        return word;
-      }
-
+      // Pass 1 — validated stems: the suffix rules are applied with their
+      // candidates checked against the known-lemma set. This keeps listed
+      // surfaces intact ("news" stays "news") while still unifying listed
+      // inflections to a listed lemma ("studies" → "study").
       for (const rule of SUFFIX_RULES) {
         if (rule.suffix.test(word)) {
           const stem = word.replace(rule.suffix, '');
           for (const candidate of rule.make(stem)) {
-            if (valid(candidate) && candidate.length > 1) return candidate;
+            if (valid(candidate) && candidate !== word && candidate.length > 1) return candidate;
           }
         }
       }
+
+      // Pass 2 — rare-word fallback: the surface is NOT itself a known lemma
+      // and no stem validated (the corpus is frequency-biased, so rare lemmas
+      // like "cacophony" are absent while "cacophonies" appears in real text).
+      // Only high-precision inflectional suffixes qualify; agentive -er and
+      // -est nouns ("gossamer", "forest") must never be stripped.
+      if (!known?.has(word)) {
+        for (const rule of FALLBACK_RULES) {
+          if (rule.suffix.test(word) && rule.guard(word)) {
+            const stem = word.replace(rule.suffix, '');
+            const candidate = rule.make(stem).find((s) => s.length >= 3);
+            if (candidate) return candidate;
+          }
+        }
+      }
+
       return word;
     },
   };
 }
 
-/** Stateless convenience wrapper when no validation set is available. */
+/**
+ * Stateless convenience wrapper — irregulars plus conservative fallbacks
+ * only (no lexicon, so no aggressive suffix rules). Production paths pass a
+ * corpus-validated lemmatizer instead.
+ */
 export const lemmatize = (surface: string): string => createLemmatizer().lemma(surface);
