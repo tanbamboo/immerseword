@@ -9,16 +9,73 @@
 <body>
   <header class="iw-header">
     <div class="iw-logo" aria-hidden="true">Iw</div>
-    <div>
+    <div class="iw-grow">
       <h1>ImmerseWord</h1>
       <p class="iw-version" id="iw-version">…</p>
     </div>
+    <button id="iw-refresh" class="iw-icon-btn" title="Refresh page data">⟳</button>
   </header>
+
   <main class="iw-body">
-    <section class="iw-card">
+    <section class="iw-card" id="iw-page-card" hidden>
+      <h2>This page</h2>
+      <div class="iw-stats" id="iw-stats">
+        <div class="iw-stat"><span class="iw-stat-num" id="st-tokens">–</span><span class="iw-stat-label">words</span></div>
+        <div class="iw-stat"><span class="iw-stat-num iw-candidate" id="st-candidates">–</span><span class="iw-stat-label">candidates</span></div>
+        <div class="iw-stat"><span class="iw-stat-num iw-unknown" id="st-unknown">–</span><span class="iw-stat-label">unknown</span></div>
+        <div class="iw-stat"><span class="iw-stat-num iw-learning" id="st-learning">–</span><span class="iw-stat-label">learning</span></div>
+      </div>
+      <div class="iw-coverage">
+        <div class="iw-coverage-bar"><div class="iw-coverage-fill" id="coverage-fill"></div></div>
+        <span id="coverage-label">–% comfortable</span>
+      </div>
+    </section>
+
+    <section class="iw-card" id="iw-nopage-card">
       <h2>Reading companion</h2>
       <p id="iw-status">Checking this page…</p>
     </section>
+
+    <section class="iw-card" id="iw-words-card" hidden>
+      <h2>Words on this page</h2>
+      <ul class="iw-word-list" id="iw-word-list"></ul>
+      <p class="iw-empty" id="iw-words-empty" hidden>No flagged words on this page. 🎉</p>
+    </section>
+
+    <section class="iw-card" id="iw-vocab-card">
+      <h2>Vocabulary</h2>
+      <div class="iw-vocab-tools">
+        <input type="search" id="iw-vocab-search" placeholder="Search your words…" />
+        <div class="iw-chips" id="iw-vocab-filters">
+          <button class="iw-chip active" data-filter="all">All</button>
+          <button class="iw-chip" data-filter="unknown">Unknown</button>
+          <button class="iw-chip" data-filter="learning">Learning</button>
+          <button class="iw-chip" data-filter="known">Known</button>
+          <button class="iw-chip" data-filter="ignored">Ignored</button>
+        </div>
+      </div>
+      <ul class="iw-word-list" id="iw-vocab-list"></ul>
+      <p class="iw-empty" id="iw-vocab-empty">Your vocabulary grows as you classify words while reading.</p>
+    </section>
+
+    <section class="iw-card">
+      <h2>Quick settings</h2>
+      <label class="iw-setting">
+        <span>My level</span>
+        <select id="iw-level">
+          <option value="2k">Top 2,000</option>
+          <option value="5k">Top 5,000</option>
+          <option value="10k">Top 10,000</option>
+          <option value="20k">Top 20,000</option>
+        </select>
+      </label>
+      <label class="iw-setting iw-toggle-row">
+        <span>Tag unknown words</span>
+        <input type="checkbox" id="iw-tagging" />
+      </label>
+      <p class="iw-hint-text">Full settings & data export live on the options page (coming soon).</p>
+    </section>
+
     <section class="iw-card iw-hint">
       <h2>The 3-pass method</h2>
       <ol>
@@ -26,6 +83,7 @@
         <li><strong>Study</strong> — tap unknown words, read English definitions.</li>
         <li><strong>Fluency</strong> — reread at full speed.</li>
       </ol>
+      <p class="iw-hint-text">Guided 3-pass sessions arrive in the next update.</p>
     </section>
   </main>
   <script src="main.js"></script>
