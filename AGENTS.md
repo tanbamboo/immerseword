@@ -22,3 +22,18 @@ When the user reports a bug:
 3. **Implement** the fix on its own `pr/NN-slug` branch and deliver via PR
    (per the branching rule above); append the outcome to the SBFP entry when
    the PR merges.
+
+## Feature-request workflow
+
+When the user requests a new feature:
+
+1. **Record** the raw request verbatim in `docs/user_feedback/feats.md` with a
+   timestamp and a stable ID (`feat-YYYY-MM-DD-NNN`). Never edit past entries.
+2. **Analyze** it and write a structured implementation proposal (SIP) in
+   `docs/sip_logs.md`: motivation, scope, UX sketch, technical approach,
+   test plan, risks, outcome.
+3. **Update docs**: extend `docs/PRD.md` and add or amend the related ADR in
+   `docs/adr/` as part of the same PR as the implementation.
+4. **Implement** on its own `pr/NN-slug` branch and deliver via PR (per the
+   branching rule above); append the outcome to the SIP entry when the PR
+   merges.
