@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ImmerseWord",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Tag unknown words, read English with monolingual definitions, and master pages with the 3-pass reading method.",
   "minimum_chrome_version": "120",
   "icons": {
@@ -50,9 +50,19 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["data/frequency.json", "data/dict-core.json"],
-      "matches": ["http://*/*", "https://*/*"]
+      "resources": [
+        "data/frequency.json",
+        "data/dict-core.json"
+      ],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ]
     }
   ],
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqp5hFPbvHedZCwL7wUv0U5mr09K9xna63zbk4YKDBMxVrxF5+N049qzFItahwmQed7DUiifi3AOQvYfcary/Yl+TBjwKlYw/M9fzUnRG/YEO1NVxRLGOI7YPQYrUPaMZb2fdHN0g0QXs3zhHgblUwp5WIW8S8IKM5roClOTR0XUiQ/u6xAgsoNVIm8jrOijRmVLTVa7tNcfy/2q3dHy5Az/RSiPP4ICoOYLVtn1edbIRAAXF3R+rL6pFHhDD/s3nibEJr+dPyUMzXGFeMZi6jgMRXzkgsknXwWVbfBCctvmdZ2+JG7xuCCVRoqt9o4b6xwy1afDfJZ7gHZ4GmHG9SQIDAQAB"
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqp5hFPbvHedZCwL7wUv0U5mr09K9xna63zbk4YKDBMxVrxF5+N049qzFItahwmQed7DUiifi3AOQvYfcary/Yl+TBjwKlYw/M9fzUnRG/YEO1NVxRLGOI7YPQYrUPaMZb2fdHN0g0QXs3zhHgblUwp5WIW8S8IKM5roClOTR0XUiQ/u6xAgsoNVIm8jrOijRmVLTVa7tNcfy/2q3dHy5Az/RSiPP4ICoOYLVtn1edbIRAAXF3R+rL6pFHhDD/s3nibEJr+dPyUMzXGFeMZi6jgMRXzkgsknXwWVbfBCctvmdZ2+JG7xuCCVRoqt9o4b6xwy1afDfJZ7gHZ4GmHG9SQIDAQAB",
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  }
 }
