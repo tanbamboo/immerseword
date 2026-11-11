@@ -145,6 +145,33 @@ describe('dictionary service — lookup chain', () => {
     expect(storage.dump().size).toBe(0); // nothing cached
   });
 
+  it('retries a failed core load on the next lookup instead of caching it (bug-2026-11-11-006)', async () => {
+    let attempts = 0;
+    const service = createDictionaryService({
+      fetchImpl: (async (url: string) => {
+        return { ok: false, status: 404, json: async () => ({}) };
+      }) as never,
+      storage: fakeStorage(),
+      loadCore: async () => {
+        attempts += 1;
+        if (attempts === 1) throw new TypeError('Failed to fetch');
+        return CORE;
+      },
+      getSettings: async () => ({ ...DEFAULT_SETTINGS, onlineFallback: false }),
+    });
+
+    // First lookup: core load fails transiently → degrades (offline → none)…
+    const degraded = await service.lookup('study');
+    expect(degraded.source).toBe('none');
+    expect(attempts).toBe(1);
+
+    // …but the failure is not cached: the next lookup retries and recovers.
+    const recovered = await service.lookup('study');
+    expect(recovered.source).toBe('core');
+    expect(recovered.lemma).toBe('study');
+    expect(attempts).toBe(2);
+  });
+
   it('survives a missing core dictionary (online-only degradation)', async () => {
     const { service } = makeService();
     const custom = createDictionaryService({

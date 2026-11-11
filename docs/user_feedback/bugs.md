@@ -88,4 +88,22 @@ report's arrival time in session.)*
 > and it still doesn't work correctly for "you're", "I'm", "you'll", I
 > can't recognize them all
 
+---
+
+## bug-2026-11-11-006 — "core dictionary failed to load: Failed to fetch" on reload
+
+**Recorded:** 2026-11-11 15:15 +0800
+**Source:** user report (ZCode session, screenshot transcribed)
+**Status:** fixed — PR-16 (`pr/16-core-load-retry`); see SBFP-006
+
+**Raw report:**
+
+> when I reload the extension, Google Chrome tell some errors, after click
+> I got this, get a snapshot for the errors
+
+**Error dialog (transcribed from the user's screenshot):**
+
+> [ImmerseWord] core dictionary failed to load: TypeError: Failed to fetch
+> `background/service-worker.js` (anonymous function) — 1 error
+
 
