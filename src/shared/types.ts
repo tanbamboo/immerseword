@@ -10,6 +10,10 @@ export type WordStatus = 'known' | 'learning' | 'unknown' | 'ignored';
 /** Frequency level: a word rarer than the band is a tagging candidate. */
 export type LevelBand = '2k' | '5k' | '10k' | '20k';
 
+/** How a tagged word is decorated: whole-word underline (default), first
+ *  character only, or nothing (tags stay functional in every mode). */
+export type TagStyle = 'underline' | 'firstChar' | 'none';
+
 /** All runtime messages flow through this discriminated union. */
 export type IwMessage =
   | { type: 'PING' }
@@ -99,6 +103,8 @@ export interface IwSettings {
   pass1ShowMarks: boolean;
   /** Allow online Free Dictionary API lookups (offline-only mode when false). */
   onlineFallback: boolean;
+  /** Tag decoration placement. Default 'underline'. */
+  tagStyle: TagStyle;
 }
 
 export const DEFAULT_SETTINGS: IwSettings = {
@@ -106,4 +112,5 @@ export const DEFAULT_SETTINGS: IwSettings = {
   taggingEnabled: true,
   pass1ShowMarks: false,
   onlineFallback: true,
+  tagStyle: 'underline',
 };

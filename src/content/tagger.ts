@@ -68,12 +68,15 @@ export function collectPageData(root: ParentNode): { stats: PageStats; words: Pa
   };
 }
 
-/** Subtrees never tagged: code, editing surfaces, media, our own UI. */
+/** Subtrees never tagged: code, editing surfaces, media, links, our own UI.
+ *  Links stay untouched — tag underlines over link styling mislead, and
+ *  the click delegation would hijack navigation (lookups on linked words
+ *  still work via selection + context menu). */
 const SKIP_SELECTOR =
   [
     'script', 'style', 'code', 'pre', 'kbd', 'samp', 'textarea', 'input',
     'select', 'option', 'button', 'noscript', 'iframe', 'svg', 'canvas',
-    'template', 'object', 'embed', 'audio', 'video', 'map',
+    'template', 'object', 'embed', 'audio', 'video', 'map', 'a',
     '[contenteditable]', '[aria-hidden="true"]', '[role="textbox"]',
     '.iw-word', '.iw-ui',
   ].join(',');
@@ -206,9 +209,15 @@ export function createTagger(options: TaggerOptions) {
         span.className = 'iw-word';
         span.dataset.lemma = result.lemma;
         span.dataset.iwStatus = result.status;
-        span.textContent = middle.nodeValue;
+        // The first character sits in its own .iw-f span so the tag-style
+        // preference can move the decoration there (CSS-only switching).
+        const text = middle.nodeValue ?? '';
+        const firstChar = document.createElement('span');
+        firstChar.className = 'iw-f';
+        firstChar.textContent = text.slice(0, 1);
+        span.append(firstChar, text.slice(1));
         middle.replaceWith(span);
-        processed.add(span.firstChild as Text); // the new text node inside the span
+        processed.add((firstChar.firstChild ?? span) as Text); // the text inside the mark
         wrapped += 1;
         void after; // after-fragment stays a sibling; later (earlier) tokens still target `node`
       } catch {
@@ -245,7 +254,14 @@ export function createTagger(options: TaggerOptions) {
     root.querySelectorAll('span.iw-word').forEach((span) => {
       const parent = span.parentNode;
       if (!parent) return;
-      while (span.firstChild) parent.insertBefore(span.firstChild, span);
+      for (const child of [...span.childNodes]) {
+        if (child instanceof HTMLElement && child.classList.contains('iw-f')) {
+          for (const inner of [...child.childNodes]) parent.insertBefore(inner, span);
+          child.remove();
+        } else {
+          parent.insertBefore(child, span);
+        }
+      }
       span.remove();
       parent.normalize();
     });

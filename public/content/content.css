@@ -1,94 +1,93 @@
 /*
- * ImmerseWord word-tag styles (ADR-0004 §5).
- * Class-scoped + custom properties only; text-decoration-based marks keep
- * host-page layout untouched. All rules opt out of inheritance surprises
- * with explicit, minimal resets on the spans themselves.
+ * ImmerseWord content styles (ADR-0004 §5).
+ * Word-tag rules are generated from src/content/tag-css.ts (TAG_CSS +
+ * tagStyleCss('light') + passCss('light')) — keep the two in sync:
+ *   node --input-type=module -e "import {TAG_CSS,tagStyleCss,passCss} from './src/content/tag-css.ts'; console.log(TAG_CSS+tagStyleCss('light')+passCss('light'))"
+ * Below that: the reader launcher and scroll lock, which only exist in the
+ * light DOM.
  */
 
 span.iw-word {
   cursor: pointer;
-  /* Never perturb host layout/typography: */
   display: inline;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  font: inherit;
-  line-height: inherit;
-  letter-spacing: inherit;
-  text-shadow: none;
-  background: transparent;
+  margin: 0; padding: 0; border: 0;
+  font: inherit; line-height: inherit; letter-spacing: inherit;
+  text-shadow: none; background: transparent;
   transition: none;
-  -webkit-user-select: text;
-  user-select: text;
+  -webkit-user-select: text; user-select: text;
 }
-
-/* Frequency-flagged but not yet classified by the learner. */
 span.iw-word[data-iw-status="candidate"] {
-  text-decoration: underline dotted;
-  text-decoration-color: var(--iw-cand-color, #b45309);
-  text-decoration-thickness: 1.5px;
-  text-underline-offset: 3px;
+  --iw-decor-style: dotted;
+  --iw-decor-color: var(--iw-cand-color, #b45309);
+  --iw-decor-thickness: 1.5px;
+  --iw-decor-offset: 3px;
 }
-
-/* Learner-classified statuses (introduced with the popover in PR-3). */
 span.iw-word[data-iw-status="unknown"] {
-  text-decoration: underline;
-  text-decoration-color: var(--iw-unknown-color, #d97706);
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
-  text-underline-position: under;
+  --iw-decor-style: solid;
+  --iw-decor-color: var(--iw-unknown-color, #d97706);
+  --iw-decor-thickness: 2px;
+  --iw-decor-offset: 3px;
+  --iw-decor-position: under;
 }
-
 span.iw-word[data-iw-status="learning"] {
-  text-decoration: underline;
-  text-decoration-color: var(--iw-learning-color, #0284c7);
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
-  text-underline-position: under;
+  --iw-decor-style: solid;
+  --iw-decor-color: var(--iw-learning-color, #0284c7);
+  --iw-decor-thickness: 2px;
+  --iw-decor-offset: 3px;
+  --iw-decor-position: under;
 }
-
 /* Known/ignored: no visual mark at all. */
 span.iw-word[data-iw-status="known"],
 span.iw-word[data-iw-status="ignored"] {
-  text-decoration: none;
+  --iw-decor-line: none;
 }
 
-/*
- * 3-pass rendering (ADR-0005): the pass lives on <html data-iw-pass="N">.
- *   Pass 1 (Gist)    — quiet page: candidates unmarked; unknown/learning
- *                      reduced to faint dots (tap-to-flag still works).
- *   Pass 2 (Study)   — full marks (the defaults above).
- *   Pass 3 (Fluency) — candidates unmarked; unknown/learning faint dots.
- * With settings.pass1ShowMarks, Pass 1 candidates show faint dots too
- * (the <html> element also gets data-iw-p1-marks, written by the content
- * script from settings).
- */
+
+html span.iw-word {
+  text-decoration-line: var(--iw-decor-line, underline);
+  text-decoration-style: var(--iw-decor-style, solid);
+  text-decoration-color: var(--iw-decor-color, currentcolor);
+  text-decoration-thickness: var(--iw-decor-thickness, 1.5px);
+  text-underline-offset: var(--iw-decor-offset, 3px);
+  text-underline-position: var(--iw-decor-position, auto);
+}
+/* firstChar: the mark moves to the wrapped first character only. */
+html[data-iw-tag-style="firstChar"] span.iw-word { text-decoration-line: none; }
+html[data-iw-tag-style="firstChar"] span.iw-word .iw-f {
+  text-decoration-line: var(--iw-decor-line, underline);
+  text-decoration-style: var(--iw-decor-style, solid);
+  text-decoration-color: var(--iw-decor-color, currentcolor);
+  text-decoration-thickness: var(--iw-decor-thickness, 1.5px);
+  text-underline-offset: var(--iw-decor-offset, 3px);
+  text-underline-position: var(--iw-decor-position, auto);
+}
+/* none: no decoration anywhere — tags stay functional (click/popover). */
+html[data-iw-tag-style="none"] span.iw-word,
+html[data-iw-tag-style="none"] span.iw-word .iw-f { text-decoration-line: none; }
+
 
 html[data-iw-pass="1"] span.iw-word[data-iw-status="candidate"],
 html[data-iw-pass="3"] span.iw-word[data-iw-status="candidate"],
 html[data-iw-pass="done"] span.iw-word[data-iw-status="candidate"] {
-  text-decoration: none;
+  --iw-decor-line: none;
 }
-
 html[data-iw-pass="1"] span.iw-word[data-iw-status="unknown"],
 html[data-iw-pass="1"] span.iw-word[data-iw-status="learning"],
 html[data-iw-pass="3"] span.iw-word[data-iw-status="unknown"],
 html[data-iw-pass="3"] span.iw-word[data-iw-status="learning"] {
-  text-decoration: underline dotted;
-  text-decoration-color: rgb(120 113 108 / 0.45);
-  text-decoration-thickness: 1.5px;
-  text-underline-offset: 3px;
-  text-underline-position: auto;
+  --iw-decor-style: dotted;
+  --iw-decor-color: rgb(120 113 108 / 0.45);
+  --iw-decor-thickness: 1.5px;
+  --iw-decor-offset: 3px;
+  --iw-decor-position: auto;
 }
-
-/* pass1ShowMarks: candidates faintly visible during Pass 1. */
-html[data-iw-pass="1"][data-iw-p1-marks] span.iw-word[data-iw-status="candidate"] {
-  text-decoration: underline dotted;
-  text-decoration-color: rgb(120 113 108 / 0.3);
-  text-decoration-thickness: 1.5px;
-  text-underline-offset: 3px;
+html[data-iw-pass="1"][data-iw-p1-marks]] span.iw-word[data-iw-status="candidate"] {
+  --iw-decor-line: underline;
+  --iw-decor-style: dotted;
+  --iw-decor-color: rgb(120 113 108 / 0.3);
+  --iw-decor-thickness: 1.5px;
+  --iw-decor-offset: 3px;
 }
-
 /* Pass 1 & 3 keep words clickable: cursor stays pointer via .iw-word base rule. */
 
 /*

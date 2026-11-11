@@ -11,7 +11,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { withHarness, watchPage } from './harness.mjs';
+import { withHarness, watchPage, openExtensionPage, getExtensionId } from './harness.mjs';
 
 async function waitFor(page, fn, timeout = 10_000) {
   await page.waitForFunction(fn, { timeout });
@@ -148,6 +148,101 @@ export const tests = [
           assert.ok(!lemmas.includes(bad), `${bad} must not be tagged, got: ${lemmas}`);
         }
         watcher.assertClean();
+        await page.close();
+      });
+    },
+  },
+  {
+    name: 'links are never tagged (feat-2026-11-11-001)',
+    async run() {
+      await withHarness(async ({ browser, baseUrl }) => {
+        const page = await browser.newPage();
+        const watcher = watchPage(page, 'fixture');
+        await page.goto(`${baseUrl}/article.html`, { waitUntil: 'load' });
+        await waitFor(page, () => document.querySelectorAll('span.iw-word').length >= 7);
+
+        await page.evaluate(() => {
+          const p = document.createElement('p');
+          p.id = 'para-links';
+          const a = document.createElement('a');
+          a.href = 'https://example.com/wonder';
+          a.textContent = 'gossamer wings and petrichor';
+          p.append('See ', a, ' plus serendipity.');
+          document.querySelector('article').appendChild(p);
+        });
+        await waitFor(
+          page,
+          () => document.querySelector('#para-links span.iw-word[data-lemma="serendipity"]') !== null,
+        );
+
+        const linkState = await page.evaluate(() => {
+          const a = document.querySelector('#para-links a');
+          return {
+            spans: a.querySelectorAll('span.iw-word').length,
+            text: a.textContent,
+            href: a.href,
+          };
+        });
+        assert.equal(linkState.spans, 0, 'no tag span may exist inside a link');
+        assert.equal(linkState.text, 'gossamer wings and petrichor');
+        assert.equal(linkState.href, 'https://example.com/wonder');
+        watcher.assertClean();
+        await page.close();
+      });
+    },
+  },
+  {
+    name: 'tag style setting restyles live: whole word / first char / none (feat-2026-11-11-001)',
+    async run() {
+      await withHarness(async ({ browser, baseUrl }) => {
+        const page = await browser.newPage();
+        await page.goto(`${baseUrl}/article.html`, { waitUntil: 'load' });
+        await waitFor(page, () => document.querySelectorAll('span.iw-word').length >= 7);
+        // chrome.storage lives in the isolated world — write it from an
+        // extension page (side panel), exactly like a real settings change.
+        const extensionId = getExtensionId(browser);
+        const panel = await openExtensionPage(browser, extensionId, 'sidepanel/sidepanel.html');
+        await page.bringToFront();
+
+        const decor = () =>
+          page.evaluate(() => {
+            const span = document.querySelector('span.iw-word[data-lemma="serendipity"]');
+            const f = span.querySelector('.iw-f');
+            return {
+              attr: document.documentElement.dataset.iwTagStyle ?? 'underline',
+              word: getComputedStyle(span).textDecorationLine,
+              firstChar: getComputedStyle(f).textDecorationLine,
+            };
+          });
+        const setStyle = (tagStyle) =>
+          panel.evaluate((style) => {
+            chrome.storage.sync.set({
+              'iw:settings': {
+                level: '5k', taggingEnabled: true, pass1ShowMarks: false,
+                onlineFallback: true, tagStyle: style,
+              },
+            });
+          }, tagStyle);
+
+        // Default: whole-word underline, no attribute on <html>.
+        const base = await decor();
+        assert.equal(base.attr, 'underline');
+        assert.equal(base.word, 'underline');
+
+        // firstChar: decoration moves to .iw-f only.
+        await setStyle('firstChar');
+        await waitFor(page, () => document.documentElement.dataset.iwTagStyle === 'firstChar');
+        const firstChar = await decor();
+        assert.equal(firstChar.word, 'none', 'whole word loses the underline');
+        assert.equal(firstChar.firstChar, 'underline', 'first character keeps the mark');
+
+        // none: no decoration anywhere.
+        await setStyle('none');
+        await waitFor(page, () => document.documentElement.dataset.iwTagStyle === 'none');
+        const none = await decor();
+        assert.equal(none.word, 'none');
+        assert.equal(none.firstChar, 'none');
+        await panel.close();
         await page.close();
       });
     },
