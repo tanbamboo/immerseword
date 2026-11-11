@@ -12,6 +12,7 @@
 import { createDictionaryService, type CoreDictionary } from './dictionary';
 import { createSessionService } from './session';
 import { getSettings } from '../shared/settings';
+import { tokenize } from '../shared/tokenizer';
 import type { IwMessage, IwSession } from '../shared/types';
 
 void chrome.sidePanel
@@ -40,7 +41,8 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (!tab?.id) return;
   // Both actions show immediate in-page feedback (popover / reader overlay).
   if (info.menuItemId === LOOKUP_MENU_ID) {
-    const lemma = (info.selectionText ?? '').trim().toLowerCase().split(/\s+/)[0] ?? '';
+    // First clean word token — "Word," / "don't" arrive with punctuation.
+    const lemma = tokenize(info.selectionText ?? '')[0]?.text.toLowerCase() ?? '';
     if (!lemma) return;
     void chrome.tabs
       .sendMessage(tab.id, { type: 'IW_SHOW_LOOKUP', lemma } satisfies IwMessage)

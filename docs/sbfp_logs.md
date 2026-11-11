@@ -38,3 +38,48 @@ merges. Append-only — never rewrite a merged proposal.
   starvation), batches run at ≥150ms intervals — slower but still progressing;
   timer throttling in real hidden tabs bounds throughput, never correctness.
 - **Outcome:** merged as PR-8 (`pr/08-reader-e2e-flake`, PR #1, commit `0f6dcc8`).
+
+---
+
+## SBFP-002 — context-menu lookup and double-click show no popover
+
+- **Reported:** 2026-11-11 (`bug-2026-11-11-002`)
+- **Symptom:** right-click a selected word → "Look up … with ImmerseWord" does
+  nothing (no popover); double-clicking a word does nothing either.
+- **Root cause:**
+  1. The `IW_SHOW_LOOKUP` content-script handler only acted when a tagged
+     `span.iw-word[data-lemma=…]` existed. Any word that is not tagged —
+     common words inside the level band, known/ignored words, tagging still
+     scanning, or tagging disabled — resolved to `shown: false` with no UI.
+     This violates PRD U8 ("look up any word via right-click even when
+     tagging is off").
+  2. Double-click lookup was never implemented — no `dblclick` handler
+     exists; it only worked incidentally on already-tagged words via the
+     single-click delegation.
+  3. (Minor) the SW menu handler took `selectionText.split(/\s+/)[0]`
+     verbatim, keeping trailing punctuation ("word," → lookup misses).
+- **Fix:**
+  - `service-worker.ts`: extract the lemma with the shared tokenizer (first
+    clean word token of the selection).
+  - `content/index.ts`: `IW_SHOW_LOOKUP` opens the popover for ANY word —
+    tagged span preferred as anchor (scroll + click, unchanged), otherwise
+    anchored to the selection; no tagging gate (U8).
+  - `content/index.ts`: new `dblclick` delegation — double-click selects the
+    word natively; the handler looks it up, anchored to the selection rect,
+    skipping editable/form surfaces and the popover's own UI; tagged words
+    stay on the single-click path (no double lookup flicker).
+  - `content/popover.ts`: `openFor`/`position` accept `HTMLElement | Range`
+    so the popover anchors to the exact selection rect, not the paragraph.
+  - `docs/PRD.md` F2: document double-click alongside click/right-click.
+- **Verification plan:** new e2e cases — context-menu message for an
+  untagged word ("house") shows the popover; real double-click on an
+  untagged word ("evening") shows the popover; existing gates green.
+- **Risks / edge cases:** empty/cleared selection → popover falls back to
+  viewport-centered; acronyms skipped; dblclick inside inputs/textareas/
+  contentable or on toolbar buttons ignored; popover-over-popover blocked.
+- **Outcome:** fixed in PR-12 (`pr/12-lookup-any-word`). Verification: new
+  e2e cases pass — context-menu lookup for untagged "house", double-click
+  lookup for untagged "evening" (headless CDP cannot synthesize a native
+  dblclick gesture, so the test reproduces the gesture's DOM effects:
+  word selection + bubbling dblclick with detail 2); typecheck, unit 95/95,
+  e2e 26/26.

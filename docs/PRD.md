@@ -81,7 +81,7 @@ pedagogically sound.
 
 ### F2 — Monolingual dictionary (U2, U8, U9)
 
-- Click (or select + right-click → "Look up with ImmerseWord") opens a popover:
+- Click (or double-click any word, or select + right-click → "Look up with ImmerseWord") opens a popover:
   - headword, phonetic IPA (when available), part of speech
   - numbered monolingual senses (up to 3), each with one example sentence when available
   - status buttons: **Known / Learning / Unknown / Ignore**
