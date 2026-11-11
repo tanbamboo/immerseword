@@ -30,6 +30,19 @@ export const tests = [
           () => document.getElementById('iw-reader')?.shadowRoot?.querySelector('.article h1') !== null,
           { timeout: 10_000 },
         );
+        // The shadow-root scan wraps words asynchronously — wait for the
+        // expected lemmas before sampling (same pattern as the test below).
+        await page.waitForFunction(
+          () => {
+            const shadow = document.getElementById('iw-reader')?.shadowRoot;
+            if (!shadow) return false;
+            const lemmas = new Set(
+              [...shadow.querySelectorAll('span.iw-word')].map((s) => s.dataset.lemma),
+            );
+            return ['serendipity', 'petrichor', 'observe'].every((w) => lemmas.has(w));
+          },
+          { timeout: 10_000 },
+        );
         const state = await page.evaluate(() => {
           const shadow = document.getElementById('iw-reader').shadowRoot;
           const root = shadow.querySelector('.root');

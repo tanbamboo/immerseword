@@ -78,6 +78,29 @@ const SKIP_SELECTOR =
     '.iw-word', '.iw-ui',
   ].join(',');
 
+/**
+ * Frame alignment is pacing, not correctness: no frames are produced in
+ * hidden/occluded tabs (or idling headless Chrome), and a scan started
+ * there must still finish instead of stalling on a rAF that never fires.
+ * Each batch waits for a frame but falls back to a timer once this budget
+ * passes — frame-flowing pages pace exactly as before.
+ */
+const FRAME_BUDGET_MS = 150;
+
+function nextBatchSlot(): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(fallback);
+      resolve();
+    };
+    const fallback = setTimeout(done, FRAME_BUDGET_MS);
+    requestAnimationFrame(done);
+  });
+}
+
 export interface VocabLike {
   statusOf(lemma: string): WordStatus | undefined;
 }
@@ -188,15 +211,11 @@ export function createTagger(options: TaggerOptions) {
     for (let i = 0; i < nodes.length; i += batchSize) {
       if (token !== currentToken()) return total; // superseded by a newer scan of THIS root
       const batch = nodes.slice(i, i + batchSize);
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => {
-          for (const node of batch) {
-            if (token !== currentToken()) return resolve();
-            total += wrapNode(node);
-          }
-          resolve();
-        });
-      });
+      await nextBatchSlot();
+      for (const node of batch) {
+        if (token !== currentToken()) return total;
+        total += wrapNode(node);
+      }
       if (globalThis.scheduler) await scheduler.yield();
     }
     return total;
