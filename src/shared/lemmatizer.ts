@@ -87,6 +87,31 @@ const IRREGULAR: Record<string, string> = {
 };
 
 /**
+ * Candidate stems for -ed/-ing surfaces, best-first. English inflectional
+ * spelling disambiguates most cases: a doubled final consonant means the
+ * base dropped nothing (running→run), a vowel + single consonant tail with
+ * no doubling means an e-drop verb (hoping→hope, shaping→shape, an e-drop
+ * verb with a short vowel would double: hopping), and a consonant + l tail
+ * is a syllabic-le verb (disgruntled→disgruntle). Everything else keeps the
+ * bare stem first (walked→walk, glistened→glisten); the remaining variants
+ * stay in the list as late candidates for validation to pick up
+ * (controlling→control).
+ */
+const DOUBLED_CONSONANT = /(bb|dd|ff|gg|mm|nn|pp|rr|tt)$/;
+// E-drop consonants: vowel + one of these usually dropped an e (hoping →
+// hope, shaping → shape). Syllable-coda n/l/r tails are usually complete
+// stems (glisten, revel, render) and stay bare-first.
+const VOWEL_CONS_TAIL = /[aeiou][pbtdcgvzmkfs]$/;
+const CONS_L_TAIL = /[b-df-hj-np-tv-xz]l$/; // disgruntl(e), handl(e)
+
+function edIngCandidates(stem: string): string[] {
+  if (DOUBLED_CONSONANT.test(stem)) return [stem.slice(0, -1), stem, stem + 'e'];
+  if (VOWEL_CONS_TAIL.test(stem)) return [stem + 'e', stem, stem.slice(0, -1)];
+  if (CONS_L_TAIL.test(stem)) return [stem + 'e', stem, stem.slice(0, -1)];
+  return [stem, stem + 'e', stem.slice(0, -1)];
+}
+
+/**
  * Ordered suffix rules. Each produces candidate stems; the first stem that
  * exists in the known-lemma set wins. Doubling/e-drop cases handled by
  * trying progressively shorter stems.
@@ -102,23 +127,9 @@ const SUFFIX_RULES: Array<{ suffix: RegExp; make: (stem: string) => string[] }> 
   { suffix: /zes$/, make: (s) => [s + 'z'] },
   // walked → walk, studied → study (ied handled above), stopped → stop
   { suffix: /ied$/, make: (s) => [s + 'y'] },
-  {
-    suffix: /ed$/,
-    make: (s) => [
-      s, // walked → walk
-      s.slice(0, -1), // stopped → stop (dedup consonant) — only if valid
-      s + 'e', // believed → believe
-    ],
-  },
+  { suffix: /ed$/, make: edIngCandidates },
   // walking → walk, making → make, running → run
-  {
-    suffix: /ing$/,
-    make: (s) => [
-      s, // walking → walk
-      s + 'e', // making → make
-      s.slice(0, -1), // running → run (dedup)
-    ],
-  },
+  { suffix: /ing$/, make: edIngCandidates },
   // quickly → quick
   { suffix: /ly$/, make: (s) => [s, s.slice(0, -1)] },
   // happiness → happy, darkness → dark, stiffness → stiff
@@ -160,8 +171,8 @@ const FALLBACK_RULES: Array<{
 }> = [
   { suffix: /ies$/, guard: (w) => w.length >= 6, make: (s) => [s + 'y'] },
   { suffix: /ied$/, guard: (w) => w.length >= 6, make: (s) => [s + 'y'] },
-  { suffix: /ing$/, guard: (w) => w.length >= 6, make: (s) => [s, s + 'e', s.slice(0, -1)] },
-  { suffix: /ed$/, guard: (w) => w.length >= 6, make: (s) => [s, s.slice(0, -1), s + 'e'] },
+  { suffix: /ing$/, guard: (w) => w.length >= 6, make: edIngCandidates },
+  { suffix: /ed$/, guard: (w) => w.length >= 6, make: edIngCandidates },
 ];
 
 export interface LemmatizerOptions {
@@ -180,7 +191,9 @@ export function createLemmatizer(options: LemmatizerOptions = {}) {
   return {
     /** Best-effort lemma for a surface form. */
     lemma(surface: string): string {
-      const word = surface.toLowerCase();
+      // Possessives first: the tokenizer keeps "market's" as one token (for
+      // display), the lemma is the possessed noun.
+      const word = surface.toLowerCase().replace(/['’]s$/, '');
       if (word.length <= 2) return word;
 
       const irregular = IRREGULAR[word];

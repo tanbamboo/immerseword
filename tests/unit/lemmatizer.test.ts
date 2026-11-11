@@ -47,6 +47,45 @@ describe('lemmatizer — suffix rules with validation', () => {
   });
 });
 
+describe('lemmatizer — possessives and e-drop/dedup ordering (bug-2026-11-11-003)', () => {
+  it('strips possessive \'s so possessed nouns classify normally', () => {
+    expect(lem.lemma("market's")).toBe('market'); // 'market' not in KNOWN here →
+    const withMarket = createLemmatizer({ knownLemmas: new Set([...KNOWN, 'market']) });
+    expect(withMarket.lemma("market's")).toBe('market');
+    expect(withMarket.lemma("family's")).toBe('family');
+  });
+
+  it('keeps listed -ly adverbs as themselves (they are their own headwords)', () => {
+    const withAdverbs = createLemmatizer({
+      knownLemmas: new Set([...KNOWN, 'roughly', 'quickly']),
+    });
+    // -ly is derivational for listed surfaces — kept at the dictionary
+    // layer (own core entries win there); the lemmatizer still collapses
+    // for band classification.
+    expect(withAdverbs.lemma('darkly')).toBe('dark');
+  });
+
+  it('rare-word fallback prefers dedup / e-restore over the bare stem', () => {
+    // None of these stems are in KNOWN — pure fallback territory.
+    expect(lem.lemma('embedding')).toBe('embed'); // doubled dd → dedup
+    expect(lem.lemma('overstated')).toBe('overstate'); // vowel+t → e-restore
+    expect(lem.lemma('disgruntled')).toBe('disgruntle'); // consonant+l → e-restore
+    expect(lem.lemma('shaping')).toBe('shape'); // vowel+p → e-restore
+    expect(lem.lemma('glistened')).toBe('glisten'); // vowel+n stays bare
+  });
+
+  it('prefers the e-restored stem when both forms are listed (hoped → hope)', () => {
+    // 'hop' and 'hope' are both words; the -ed spelling (not 'hopped')
+    // proves the verb dropped an e, so 'hope' must win.
+    const both = createLemmatizer({ knownLemmas: new Set([...KNOWN, 'hop', 'hope']) });
+    expect(both.lemma('hoped')).toBe('hope');
+    expect(both.lemma('hoping')).toBe('hope');
+    // …while a doubled spelling still dedups to the short vowel form.
+    expect(both.lemma('hopped')).toBe('hop');
+    expect(both.lemma('hopping')).toBe('hop');
+  });
+});
+
 describe('lemmatizer — validation prevents bad stems', () => {
   it('keeps unknown-inflated forms as themselves when no stem validates', () => {
     // 'bing' is not a known lemma; 'b' + dedup paths invalid → falls to 'bing'
