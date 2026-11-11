@@ -122,6 +122,19 @@ describe('tagger — wrapping', () => {
     const tagger = makeTagger();
     expect(await tagger.scan(root)).toBe(1); // only serendipity
   });
+
+  it('treats possessives as their base noun (bug-2026-11-11-003)', async () => {
+    // "family's" — 'family' is corpus-listed → common → not tagged at all
+    // (previously every possessive was rank-0 "ultra-rare" garbage).
+    // "vendor's" — 'vendor' is unlisted → tagged with the clean lemma.
+    const root = article("<p>The family's car and the vendor's stall.</p>");
+    const tagger = makeTagger();
+    await tagger.scan(root);
+    const lemmas = lemmasIn(root);
+    expect(lemmas).not.toContain("family's");
+    expect(lemmas).not.toContain("vendor's");
+    expect(lemmas).toContain('vendor');
+  });
 });
 
 describe('tagger — skip rules', () => {

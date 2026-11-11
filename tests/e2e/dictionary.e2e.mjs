@@ -44,6 +44,31 @@ export const tests = [
     },
   },
   {
+    name: 'DICT_LOOKUP keeps headword surfaces and resolves possessives (bug-2026-11-11-003)',
+    async run() {
+      await withHarness(async ({ browser }) => {
+        const extensionId = getExtensionId(browser);
+        const panel = await openExtensionPage(browser, extensionId, 'sidepanel/sidepanel.html');
+        const watcher = watchPage(panel, 'sidepanel');
+
+        // A surface with its own core entry keeps itself — "roughly" must
+        // never resolve to its adjective "rough".
+        const roughly = await sendLookup(panel, 'roughly');
+        assert.equal(roughly.source, 'core');
+        assert.equal(roughly.lemma, 'roughly');
+        assert.ok(roughly.entry.senses.length >= 1);
+
+        // Possessive is not a headword → the possessed noun.
+        const possessive = await sendLookup(panel, "market's");
+        assert.equal(possessive.source, 'core');
+        assert.equal(possessive.lemma, 'market');
+
+        watcher.assertClean();
+        await panel.close();
+      });
+    },
+  },
+  {
     name: 'DICT_LOOKUP handles unknown words deterministically (none or api, never hangs)',
     async run() {
       await withHarness(async ({ browser }) => {

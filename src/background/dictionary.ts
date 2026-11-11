@@ -8,6 +8,7 @@
  * Dependencies are injected so unit tests never touch the network.
  */
 
+import { createLemmatizer } from '../shared/lemmatizer';
 import type { DictionaryEntry, DictionarySense, IwSettings } from '../shared/types';
 
 /** dict-core.json value: lemma → senses of [posCode, definition, example?]. */
@@ -60,6 +61,8 @@ export interface DictionaryDeps {
 
 export function createDictionaryService(deps: DictionaryDeps) {
   let corePromise: Promise<CoreDictionary | null> | null = null;
+  /** Lemmatizer validated against core headwords; built once core loads. */
+  let lemmatizer: ReturnType<typeof createLemmatizer> | null = null;
 
   const core = (): Promise<CoreDictionary | null> => {
     corePromise ??= deps.loadCore().catch((err: unknown) => {
@@ -131,10 +134,25 @@ export function createDictionaryService(deps: DictionaryDeps) {
 
   return {
     async lookup(rawLemma: string): Promise<LookupResult> {
-      const lemma = rawLemma.toLowerCase().trim();
-      if (!lemma) return { lemma, entry: null, source: 'none' };
+      const surface = rawLemma.toLowerCase().trim();
+      if (!surface) return { lemma: surface, entry: null, source: 'none' };
 
-      const coreEntry = fromCore(lemma, await core());
+      const coreData = await core();
+
+      // A surface with its own core entry keeps itself ("roughly", "evening"
+      // are headwords, not inflections). Only a core miss resolves against
+      // headwords: possessives → the noun ("market's" → "market"), unlisted
+      // inflections → the base ("hoped" → "hope", "studies" → "study").
+      let lemma = surface;
+      if (!coreData?.[surface]) {
+        if (coreData) {
+          lemmatizer ??= createLemmatizer({ knownLemmas: new Set(Object.keys(coreData)) });
+          const resolved = lemmatizer.lemma(surface);
+          if (coreData[resolved]) lemma = resolved;
+        }
+      }
+
+      const coreEntry = fromCore(lemma, coreData);
       if (coreEntry) return { lemma, entry: coreEntry, source: 'core' };
 
       const cached = await readCache(lemma);

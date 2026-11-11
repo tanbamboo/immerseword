@@ -83,3 +83,62 @@ merges. Append-only — never rewrite a merged proposal.
   dblclick gesture, so the test reproduces the gesture's DOM effects:
   word selection + bubbling dblclick with detail 2); typecheck, unit 95/95,
   e2e 26/26.
+
+---
+
+## SBFP-003 — wrong lemmas: possessives, ing/ed fallbacks, -ly adverbs
+
+- **Reported:** 2026-11-11 (`bug-2026-11-11-003`)
+- **Symptom (as reported):** "market's"/"vendor's" mishandled; `shaping`
+  should resolve to `shape`; `roughly` must not collapse to `rough`;
+  `embedding` → "no definition for embedd"; `overstated → overstat`,
+  `disgruntled → disgruntl`, `shaping → shap`.
+- **Root cause (verified against the shipped data):**
+  1. Possessives: the tokenizer keeps `market's` as one token (correct for
+     display), but the lemmatizer never strips `['’]s` — every possessive
+     is unranked (rank 0), so common-word possessives get tagged as
+     ultra-rare with the garbage lemma `market's`.
+  2. Rare-word fallback (`FALLBACK_RULES`) returns the first candidate of
+     length ≥ 3 with no validation and worst-first ordering: bare stem
+     before e-restore/dedup → `embedding→embedd`, `overstated→overstat`,
+     `disgruntled→disgruntl`. Pass-1 validated rules have the same ordering
+     flaw when bare and e-restored stems are both listed (`hoped→hop`).
+  3. `-ly` is treated as inflectional: listed adverbs with their own
+     dictionary headwords (`roughly`, freq 8296, in dict-core) collapse to
+     the adjective (`rough`) because `resolveForm` prefers the lower rank.
+  4. The dictionary service never lemmatizes: raw tokens from the
+     double-click/context-menu paths (`shaping`, `market's`) go straight to
+     core/API and miss.
+- **Fix:**
+  - `lemmatizer.ts`: strip `['’]s$` on entry; shared `edIngCandidates()`
+    ordering — doubled consonant → dedup (`embedd→embed`), vowel + e-drop
+    consonant (p b t d c g v z m k f s) → e-restore first (`shap→shape`,
+    `overstat→overstate`, `hop→hope`), consonant+l → e-restore first
+    (`disgruntl→disgruntle`), otherwise bare first (`glisten`, `walk` stay)
+    — applied in both validated Pass 1 and the rare-word fallback.
+  - `dictionary.ts`: surface-first resolution — a surface with its own core
+    entry keeps itself (`roughly`, `evening`, `slowly`, `shaping` are
+    headwords); only a core miss resolves via a core-validated lemmatizer
+    (`market's`→`market`, `hoped`→`hope`), and the resolved form must itself
+    be a headword, else the surface stays as the cache/API key
+    (`embedding` queries the API as itself).
+  - Design pivot during implementation: the first cut collapsed `-ing`
+    forms before checking the surface (and kept listed `-ly` surfaces in
+    the tagger). Both broke in review: `evening`→`even` (wrong word's
+    entry) and `slowly` (rank 5048) became a tagging candidate at the
+    default level. Settled rule: headword surfaces are authoritative in the
+    dictionary; the tagger's `-ly` band behavior is unchanged.
+- **Verification plan:** unit — lemmatizer (all reported pairs, `hoped→hope`
+  vs `hopped→hop`, `glistened→glisten` regression), dictionary service
+  (surface-first + possessive + API-key behavior), tagger (possessives:
+  `family's` untagged, `vendor's` tagged with lemma `vendor`); e2e —
+  `DICT_LOOKUP` keeps `roughly`, resolves `market's`→`market` through the
+  real worker + core data.
+- **Risks / edge cases:** gerunds with own entries show their own
+  definition (`shaping` shows the "process" noun, not `shape`'s entry) —
+  a real, on-topic definition either way, never `shap`; fallback remains
+  best-effort for words absent from every list; `ll` excluded from dedup
+  (`polling→poll`, `controlling→control` via late dedup candidate).
+- **Outcome:** fixed in PR-13 (`pr/13-lemma-quality`). Gates: typecheck,
+  unit 101/101, e2e 27/27. Spot check on the shipped data: all six reported
+  words produce sane tagger keys and popover lookups on every path.

@@ -39,3 +39,24 @@ report's arrival time in session.)*
 > aren't any popup window displayed; and double clicking the word also
 > doesn't work.
 
+---
+
+## bug-2026-11-11-003 — wrong lemmas: possessives, ing/ed forms, -ly adverbs
+
+**Recorded:** 2026-11-11 14:10 +0800
+**Source:** user report (ZCode session)
+**Status:** fixed — PR-13 (`pr/13-lemma-quality`); see SBFP-003
+
+**Raw report:**
+
+> when I use the extension, I found it doesn't work correctly when there are
+> something like "market's", "vendor's", and not work properly for
+> "shaping"(should show the definition of shape, as it's the ing form of
+> shape), "roughly"(should not show the definition of rough), "embedding"
+> (should show definition of embedding or embed, but show it can't find the
+> definition of embedd), and some mistakes likes:
+> overstated -> overstat
+> disgruntled -> disgruntl
+> shaping -> shap
+
+

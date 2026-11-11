@@ -20,6 +20,11 @@ function fakeStorage() {
 const CORE: CoreDictionary = {
   study: [['n', 'a detailed critical inspection']],
   happy: [['a', 'enjoying or showing joy'], ['adj2', 'well expressed']],
+  shape: [['n', 'the external form of something'], ['v', 'give form to']],
+  roughly: [['r', 'about; approximately']],
+  rough: [['a', 'having an uneven surface']],
+  market: [['n', 'a place where goods are traded']],
+  hope: [['v', 'expect and wish']],
 };
 
 function apiResponse(lemma: string) {
@@ -67,6 +72,29 @@ describe('dictionary service — lookup chain', () => {
     expect(result.entry?.senses[0]?.partOfSpeech).toBe('noun');
     expect(fetchCalls).toHaveLength(0);
     expect(storage.dump().size).toBe(0);
+  });
+
+  it('resolves surfaces against core headwords before the chain (bug-2026-11-11-003)', async () => {
+    const { service, fetchCalls } = makeService();
+    // Own-headword surfaces keep themselves — never a related word's entry.
+    const roughly = await service.lookup('roughly');
+    expect(roughly.source).toBe('core');
+    expect(roughly.lemma).toBe('roughly');
+    expect(roughly.entry?.senses[0]?.definition).toBe('about; approximately');
+    // Possessive is not a headword → possessed noun's entry.
+    const possessive = await service.lookup("market's");
+    expect(possessive.source).toBe('core');
+    expect(possessive.lemma).toBe('market');
+    // Unlisted inflection → base headword's entry.
+    const hoped = await service.lookup('hoped');
+    expect(hoped.source).toBe('core');
+    expect(hoped.lemma).toBe('hope');
+    expect(hoped.entry?.senses[0]?.definition).toBe('expect and wish');
+    // Inflections whose base is not in core stay themselves for the API.
+    const embedding = await service.lookup('embedding');
+    expect(embedding.source).toBe('none');
+    expect(embedding.lemma).toBe('embedding');
+    expect(fetchCalls.some((url) => url.endsWith('/embedding'))).toBe(true);
   });
 
   it('normalizes case and skips empty input', async () => {
