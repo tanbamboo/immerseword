@@ -185,3 +185,35 @@ merges. Append-only — never rewrite a merged proposal.
 - **Outcome:** fixed in PR-14 (`pr/14-brand-domain-tagging`). Gates:
   typecheck, unit 102/102, e2e 28/28 — including the reported sentence
   asserted end-to-end on the live page.
+
+---
+
+## SBFP-005 — contractions tagged as unknown words
+
+- **Reported:** 2026-11-11 (`bug-2026-11-11-005`)
+- **Symptom:** "you're", "I'm", "you'll" tagged as unknown words; reporter
+  notes the list is not exhaustive ("I can't recognize them all").
+- **Root cause (verified on the shipped corpus):** the tokenizer keeps
+  apostrophe forms as single tokens (right for display), but the corpus has
+  no rank for them and the lemmatizer only reduces possessive `'s`. Every
+  clitic contraction (`you're`, `I'm`, `you'll`, `can't`, `won't`,
+  `don't` …) and fixed apostrophe form (`o'clock`, `ma'am`) resolves to
+  itself at rank 0 → "rarer than every band" → tagged at every level.
+  (`it's`, `John's` are fine since PR-13's possessive strip.)
+- **Fix (class-wide, not a suffix list):** in `classify()`, after
+  `resolveForm`, a lemma that STILL contains an apostrophe and ranks 0 is
+  not vocabulary — no analysis could make sense of it — skip it like
+  acronyms/brands. Possessives keep working because `resolveForm` strips
+  `'s` first ("vendor's" → "vendor" ranks-or-not without an apostrophe and
+  stays taggable).
+- **Verification plan:** unit — the reported contractions plus `can't`,
+  `won't`, `o'clock`, `ma'am` untagged while `vendor's`→vendor and
+  ordinary rare words still tag; e2e — contraction sentence on the live
+  page (sentinel-proven rescan) tags none of them.
+- **Risks / edge cases:** a rare word that happens to contain an apostrophe
+  and is absent from all lists is skipped — English has no such learnable
+  vocabulary (contractions/possessives/fixed forms only); user-initiated
+  lookups still accept any string.
+- **Outcome:** fixed in PR-15 (`pr/15-contractions`). Gates: typecheck,
+  unit 103/103, e2e 29/29 — contraction sentence (straight and curly
+  apostrophes) asserted end-to-end on the live page.

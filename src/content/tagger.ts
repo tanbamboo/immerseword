@@ -136,6 +136,10 @@ export function createTagger(options: TaggerOptions) {
     // The vocabulary key is whichever form the rank resolver settled on:
     // a common surface beats a bogus rare lemma ("family" ≠ "fam").
     const lemma = options.frequency.resolveForm(text);
+    // Contractions and fixed apostrophe forms ("you're", "I'm", "can't",
+    // "o'clock") that no analysis can rank — the lemma still carries the
+    // apostrophe — are function words / fixed forms, not vocabulary.
+    if (/['’]/.test(lemma) && options.frequency.rank(lemma) === 0) return null;
     const status = vocab?.statusOf(lemma);
     if (status === 'known' || status === 'ignored') return null;
     return { lemma, status: status ?? 'candidate' };

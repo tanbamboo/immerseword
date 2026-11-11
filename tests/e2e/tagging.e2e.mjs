@@ -116,6 +116,43 @@ export const tests = [
     },
   },
   {
+    name: 'contractions are never tagged (bug-2026-11-11-005)',
+    async run() {
+      await withHarness(async ({ browser, baseUrl }) => {
+        const page = await browser.newPage();
+        const watcher = watchPage(page, 'fixture');
+        await page.goto(`${baseUrl}/article.html`, { waitUntil: 'load' });
+        await waitFor(page, () => document.querySelectorAll('span.iw-word').length >= 7);
+
+        await page.evaluate(() => {
+          const p = document.createElement('p');
+          p.id = 'para-contractions';
+          p.textContent =
+            "You're reading and I'm listening; you'll see it, we can't stop and they won't " +
+            'mind, by nine o’clock the ma’am sighed at the defenestration.';
+          document.querySelector('article').appendChild(p);
+        });
+        await waitFor(
+          page,
+          () =>
+            document.querySelector('#para-contractions span.iw-word[data-lemma="defenestration"]') !==
+            null,
+        );
+
+        const lemmas = await page.evaluate(() =>
+          [...document.querySelector('#para-contractions').querySelectorAll('span.iw-word')].map(
+            (s) => s.dataset.lemma,
+          ),
+        );
+        for (const bad of ["you're", "i'm", "you'll", "can't", "won't", 'o’clock', 'ma’am']) {
+          assert.ok(!lemmas.includes(bad), `${bad} must not be tagged, got: ${lemmas}`);
+        }
+        watcher.assertClean();
+        await page.close();
+      });
+    },
+  },
+  {
     name: 'code, pre and textarea are never tagged',
     async run() {
       await withHarness(async ({ browser, baseUrl }) => {
