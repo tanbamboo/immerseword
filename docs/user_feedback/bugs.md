@@ -59,4 +59,20 @@ report's arrival time in session.)*
 > disgruntled -> disgruntl
 > shaping -> shap
 
+---
+
+## bug-2026-11-11-004 — brands and domain names tagged as unknown words
+
+**Recorded:** 2026-11-11 14:43 +0800
+**Source:** user report (ZCode session)
+**Status:** fixed — PR-14 (`pr/14-brand-domain-tagging`); see SBFP-004
+
+**Raw report:**
+
+> when I use the extension, I found it doesn't work correctly when process
+> sentence like " hashes, external IPs, domains and URLs (VirusTotal,
+> abuse.ch, AbuseIPDB, GreyNoise, urlscan.io)", it shouldn't tag
+> VirusTotal, AbuseIPDB, GreyNoise, urlscan(contain in urlscan.io) as
+> word, these are some product names, brands or domain names.
+
 

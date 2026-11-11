@@ -6,7 +6,7 @@
  * started later invalidates work still queued by an earlier one.
  */
 
-import { tokenize, isAcronym } from '../shared/tokenizer';
+import { tokenize, isAcronym, isBrandLike, type Token } from '../shared/tokenizer';
 import type { FrequencyIndex } from '../shared/frequency';
 import type { IwSettings, PageStats, PageWord, WordStatus } from '../shared/types';
 
@@ -131,6 +131,7 @@ export function createTagger(options: TaggerOptions) {
 
   function classify(text: string): { lemma: string; status: TagStatus } | null {
     if (isAcronym(text)) return null;
+    if (isBrandLike(text)) return null; // brands/products ("VirusTotal"), acronym plurals ("URLs")
     if (!options.frequency.isRarerThan(text, settings.level)) return null; // within band → common
     // The vocabulary key is whichever form the rank resolver settled on:
     // a common surface beats a bogus rare lemma ("family" ≠ "fam").
@@ -170,15 +171,28 @@ export function createTagger(options: TaggerOptions) {
   }
 
   /**
+   * True when the token is part of a hostname in the raw text: immediately
+   * followed by ".letters" ("urlscan" in urlscan.io, "abuse" in abuse.ch)
+   * or immediately preceded by a dot (the "io"/"ch" pieces) — components,
+   * not words.
+   */
+  function insideHostname(raw: string, token: Token): boolean {
+    if (token.start > 0 && raw[token.start - 1] === '.') return true;
+    return /^\.[A-Za-z]{2,}/.test(raw.slice(token.end));
+  }
+
+  /**
    * Wraps taggable tokens of one text node. Splits happen from the end of
    * the string backwards so earlier offsets stay valid. Returns the number
    * of spans created (0 = untouched node).
    */
   function wrapNode(node: Text): number {
-    const tokens = tokenize(node.nodeValue ?? '');
+    const raw = node.nodeValue ?? '';
+    const tokens = tokenize(raw);
     let wrapped = 0;
     for (let i = tokens.length - 1; i >= 0; i--) {
       const token = tokens[i]!;
+      if (insideHostname(raw, token)) continue;
       const result = classify(token.text);
       if (!result) continue;
       try {

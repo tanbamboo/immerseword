@@ -30,3 +30,13 @@ export function tokenize(text: string): Token[] {
 export function isAcronym(token: string): boolean {
   return token.length > 1 && token === token.toUpperCase() && /[A-Z]/.test(token);
 }
+
+/**
+ * True for token shapes that are proper nouns, never learnable English
+ * words: CamelCase brands and products ("VirusTotal", "AbuseIPDB",
+ * "GreyNoise", "iPhone", "McDonald") and pluralized acronyms ("URLs",
+ * "IPs", "IDs"). Pure ALL-CAPS tokens are acronyms (see isAcronym).
+ */
+export function isBrandLike(token: string): boolean {
+  return /[a-z][A-Z]/.test(token) || /^[A-Z]{2,}s$/.test(token);
+}
