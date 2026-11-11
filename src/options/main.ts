@@ -7,7 +7,7 @@
 import { getSettings, setSettings, type SyncStorageLike } from '../shared/settings';
 import { createVocabStore, type VocabEntry } from '../shared/vocab';
 import { buildExportPayload, parseImportPayload, type ReaderPrefsShape } from '../shared/dataio';
-import { DEFAULT_SETTINGS, type LevelBand, type IwSettings } from '../shared/types';
+import { DEFAULT_SETTINGS, type LevelBand, type TagStyle, type IwSettings } from '../shared/types';
 import type { ReaderPrefs } from '../content/reader';
 
 const sync = chrome.storage.sync as SyncStorageLike;
@@ -43,6 +43,7 @@ async function refresh(): Promise<void> {
   (el('#opt-tagging') as HTMLInputElement).checked = settings.taggingEnabled;
   (el('#opt-pass1-marks') as HTMLInputElement).checked = settings.pass1ShowMarks;
   (el('#opt-online') as HTMLInputElement).checked = settings.onlineFallback;
+  (el('#opt-tag-style') as HTMLSelectElement).value = settings.tagStyle;
 
   const prefs = await loadReaderPrefs();
   (el('#opt-theme') as HTMLSelectElement).value = prefs.theme;
@@ -55,6 +56,10 @@ function bindSettings(): void {
   el('#opt-level').addEventListener('change', async (event) => {
     await setSettings(sync, { level: (event.target as HTMLSelectElement).value as LevelBand });
     status('Level saved — open pages retag automatically.');
+  });
+  el('#opt-tag-style').addEventListener('change', async (event) => {
+    await setSettings(sync, { tagStyle: (event.target as HTMLSelectElement).value as TagStyle });
+    status('Tag style saved — open pages restyle instantly.');
   });
   for (const [id, key] of [
     ['#opt-tagging', 'taggingEnabled'],

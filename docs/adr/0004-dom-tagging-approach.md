@@ -54,3 +54,22 @@ display on the spans).
 - **innerHTML regex replace**: destroys event listeners and framework state. Rejected
   absolutely.
 - **Canvas/overlay markers**: coordinate math breaks on scroll/zoom/reflow; fragile.
+
+## Amendments
+
+**2026-11-11 (PR-17, feat-2026-11-11-001).** Two changes to §Decision:
+
+1. **Links are skipped** (`a` joins the skip-filter). Tag decorations over link styling
+   mislead ("is this a link or an unknown word?"), and the document-level click
+   delegation `preventDefault()`s on tagged words — a tagged word inside a link would
+   hijack navigation. Lookups on linked words remain available through selection +
+   context menu.
+2. **Decoration placement is configurable** (`settings.tagStyle`:
+   `underline | firstChar | none`). Each tag wraps its first character in
+   `<span class="iw-f">` at tag time; statuses and passes set `--iw-decor-*` custom
+   properties on `.iw-word` and placement rules apply them either to the whole span or
+   to `.iw-f` only — switching styles is pure CSS (`<html data-iw-tag-style>`), no
+   rewrap. `untag()` unwraps both levels, restoring pristine text nodes. Inside the
+   reader's shadow root, `<html>`-attribute rules use `:host-context(html[attr])`
+   (this also fixed a latent bug where the shadow pass rules used
+   `:host-context(html)[attr]`, which matched nothing).

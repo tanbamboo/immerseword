@@ -186,6 +186,7 @@ async function init(): Promise<void> {
     void tagger.scan(document.body);
   }
   applyP1MarksSetting(currentSettings);
+  applyTagStyleSetting(currentSettings);
 
   watchMutations();
 }
@@ -225,6 +226,15 @@ function applyP1MarksSetting(settings: IwSettings): void {
   }
 }
 
+/** Tag decoration placement (SIP-001): absent attribute = whole-word underline. */
+function applyTagStyleSetting(settings: IwSettings): void {
+  if (settings.tagStyle === 'underline') {
+    delete document.documentElement.dataset.iwTagStyle;
+  } else {
+    document.documentElement.dataset.iwTagStyle = settings.tagStyle;
+  }
+}
+
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'sync' || !changes['iw:settings'] || !tagger) return;
   const next = { ...DEFAULT_SETTINGS, ...(changes['iw:settings'].newValue as Partial<IwSettings>) };
@@ -232,6 +242,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   currentSettings = next;
   tagger.applySettings(next);
   applyP1MarksSetting(next);
+  applyTagStyleSetting(next);
   if (levelChanged) {
     tagger.untag();
     if (next.taggingEnabled) void tagger.scan(document.body);

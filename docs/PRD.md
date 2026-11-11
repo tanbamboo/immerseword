@@ -73,7 +73,12 @@ pedagogically sound.
   | `known` / common word | no highlight | — |
   | `ignored` | never show (names, brand terms…) | — |
 - Skipped entirely: `script`, `style`, `code`, `pre`, `textarea`, `input`, `contenteditable`,
-  ARIA-hidden subtrees, already-tagged nodes.
+  ARIA-hidden subtrees, already-tagged nodes, and **links** (`a`) — links are never modified:
+  tag underlines over link styling mislead and tagged-word clicks would hijack navigation;
+  lookups on linked words still work via selection + right-click.
+- Tag mark style (setting): **whole-word underline** (default), **first-character mark**
+  (only the first letter carries the decoration), or **no visible mark** — tags stay
+  clickable in every mode; switching restyles open pages instantly without retagging.
 - Performance budget: scanning and wrapping are batched (rAF + scheduler.yield), pages with
   >5,000 candidate words are processed in chunks; no long tasks >50 ms attributable to the
   extension during steady-state reading.

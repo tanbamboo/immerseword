@@ -67,6 +67,28 @@ beforeEach(() => {
 });
 
 describe('tagger — wrapping', () => {
+  it('never tags inside links and wraps the first char in .iw-f (feat-2026-11-11-001)', async () => {
+    const root = article(
+      '<p>See <a href="https://example.com/wonder">gossamer wings</a> and serendipity.</p>',
+    );
+    const tagger = makeTagger();
+    await tagger.scan(root);
+
+    // Links are untouched: no spans, text and href intact.
+    const link = root.querySelector('a')!;
+    expect(link.querySelectorAll('span.iw-word')).toHaveLength(0);
+    expect(link.textContent).toBe('gossamer wings');
+
+    // Words outside the link tag; the first character sits in .iw-f so the
+    // tag-style preference can move the decoration (CSS-only switching).
+    const span = root.querySelector<HTMLElement>('span.iw-word[data-lemma="serendipity"]')!;
+    expect(span).not.toBeNull();
+    expect(span.textContent).toBe('serendipity'); // text preserved exactly
+    const f = span.querySelector<HTMLElement>('.iw-f')!;
+    expect(f.textContent).toBe('s');
+    expect(f.parentElement).toBe(span);
+  });
+
   it('wraps words rarer than the level band, leaves common words untouched', async () => {
     const root = article('<p>The house was quiet, but the air felt full of serendipity.</p>');
     const tagger = makeTagger(); // level 5k — every corpus word ranks well within band

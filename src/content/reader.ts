@@ -7,7 +7,7 @@
  */
 
 import { Readability, isProbablyReaderable } from '@mozilla/readability';
-import { TAG_CSS, passCss } from './tag-css';
+import { TAG_CSS, tagStyleCss, passCss } from './tag-css';
 
 export interface ReaderPrefs {
   theme: 'light' | 'sepia' | 'dark';
@@ -102,7 +102,8 @@ export function createReader(deps: ReaderDeps) {
       .byline { opacity: 0.7; font-size: 0.85em; margin: 0 0 1.6em; }
       .article p { line-height: 1.75; margin: 0 0 1.1em; }
       ${TAG_CSS}
-      ${passCss(':host-context(html)')}
+      ${tagStyleCss('shadow')}
+      ${passCss('shadow')}
     `;
   }
 
@@ -121,6 +122,18 @@ export function createReader(deps: ReaderDeps) {
   function extract(): { title: string; byline: string; content: string } | null {
     try {
       const docClone = document.cloneNode(true) as Document;
+      // Present the pristine article: unwrap our tags in the clone before
+      // parsing. Readability also strips class attributes, which would turn
+      // cloned tags into classless spans — with .iw-f splitting words into
+      // fragments the shadow scan would re-tag as broken lemmas
+      // ("erendipity"); the pristine text re-tags cleanly instead.
+      docClone.querySelectorAll('span.iw-word, span.iw-f').forEach((span) => {
+        const parent = span.parentNode;
+        if (!parent) return;
+        while (span.firstChild) parent.insertBefore(span.firstChild, span);
+        span.remove();
+        parent.normalize();
+      });
       // Readability mutates its input; the clone keeps the live page safe.
       const parsed = new Readability(docClone).parse();
       if (!parsed?.content) return null;
