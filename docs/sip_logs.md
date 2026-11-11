@@ -1,4 +1,4 @@
-# Structured Implementation Proposal (SIP) Log
+# Structured Improvement Proposal (SIP) Log
 
 One proposal per analyzed feature request
 ([raw records](user_feedback/feats.md)). Write the proposal — and the PRD /
