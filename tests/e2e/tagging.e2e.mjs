@@ -79,6 +79,43 @@ export const tests = [
     },
   },
   {
+    name: 'brands, acronym plurals, and hostnames are never tagged (bug-2026-11-11-004)',
+    async run() {
+      await withHarness(async ({ browser, baseUrl }) => {
+        const page = await browser.newPage();
+        const watcher = watchPage(page, 'fixture');
+        await page.goto(`${baseUrl}/article.html`, { waitUntil: 'load' });
+        await waitFor(page, () => document.querySelectorAll('span.iw-word').length >= 7);
+
+        // The user's sentence, plus a sentinel rare word proving the rescan
+        // reached this node before we assert absences.
+        await page.evaluate(() => {
+          const p = document.createElement('p');
+          p.id = 'para-brands';
+          p.textContent =
+            'hashes, external IPs, domains and URLs (VirusTotal, abuse.ch, AbuseIPDB, ' +
+            'GreyNoise, urlscan.io) and serendipity';
+          document.querySelector('article').appendChild(p);
+        });
+        await waitFor(
+          page,
+          () => document.querySelector('#para-brands span.iw-word[data-lemma="serendipity"]') !== null,
+        );
+
+        const lemmas = await page.evaluate(() =>
+          [...document.querySelector('#para-brands').querySelectorAll('span.iw-word')].map(
+            (s) => s.dataset.lemma,
+          ),
+        );
+        for (const bad of ['virustotal', 'abuseipdb', 'greynoise', 'urlscan', 'urls', 'ips', 'io']) {
+          assert.ok(!lemmas.includes(bad), `${bad} must not be tagged, got: ${lemmas}`);
+        }
+        watcher.assertClean();
+        await page.close();
+      });
+    },
+  },
+  {
     name: 'code, pre and textarea are never tagged',
     async run() {
       await withHarness(async ({ browser, baseUrl }) => {

@@ -142,3 +142,46 @@ merges. Append-only — never rewrite a merged proposal.
 - **Outcome:** fixed in PR-13 (`pr/13-lemma-quality`). Gates: typecheck,
   unit 101/101, e2e 27/27. Spot check on the shipped data: all six reported
   words produce sane tagger keys and popover lookups on every path.
+
+---
+
+## SBFP-004 — brands and domain names tagged as unknown words
+
+- **Reported:** 2026-11-11 (`bug-2026-11-11-004`)
+- **Symptom:** in "hashes, external IPs, domains and URLs (VirusTotal,
+  abuse.ch, AbuseIPDB, GreyNoise, urlscan.io)" the tagger flags
+  VirusTotal, AbuseIPDB, GreyNoise, urlscan — product names, brands, and
+  domain components.
+- **Root cause (verified on the shipped corpus):**
+  1. Mixed-case compounds are one token with no interior boundaries;
+     lowercased (`virustotal`) they are unlisted → rank 0 → "rarer than
+     every band" → always tagged. `isAcronym` only catches pure ALL-CAPS.
+  2. Acronym plurals (`URLs` rank 9196, `IPs` 9663) and TLD pieces (`io`
+     8996) sit just beyond the 5k band → tagged as ordinary rare words.
+  3. `urlscan` is all-lowercase — indistinguishable from a rare word at
+     token level; only its raw-text context (`.io` immediately after, or a
+     `.` immediately before for TLD pieces) identifies it as a hostname
+     component.
+- **Fix:**
+  - `tokenizer.ts` `isBrandLike()`: interior case boundary
+    (`/[a-z][A-Z]/` — VirusTotal, AbuseIPDB, GreyNoise, iPhone, McDonald)
+    or pluralized acronym (`/^[A-Z]{2,}s$/` — URLs, IPs, IDs); classify()
+    skips them like acronyms.
+  - `tagger.ts` `insideHostname()`: a token whose raw text is immediately
+    followed by `.letters` (urlscan in urlscan.io, abuse in abuse.ch) or
+    immediately preceded by `.` (io, ch, com pieces) is a hostname
+    component — never tagged.
+  - User-initiated lookups (double-click / context menu) still work on any
+    string by design; only automatic tagging skips these shapes.
+- **Verification plan:** unit — the reported sentence tags none of the
+  brand/domain/acronym tokens while still tagging ordinary rare words;
+  e2e — the sentence injected into the live page tags none of them (with a
+  sentinel rare word proving the rescan ran).
+- **Risks / edge cases:** CamelCase detection cannot distinguish a brand
+  from a legitimately rare CamelCase neologism — both are proper nouns and
+  skipping is correct; a rare word in typo'd no-space-after-period text
+  ("word.Io") is skipped — acceptable collateral; hostname detection is
+  single-text-node scoped (components split across nodes are not joined).
+- **Outcome:** fixed in PR-14 (`pr/14-brand-domain-tagging`). Gates:
+  typecheck, unit 102/102, e2e 28/28 — including the reported sentence
+  asserted end-to-end on the live page.

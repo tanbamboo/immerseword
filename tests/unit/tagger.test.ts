@@ -135,6 +135,29 @@ describe('tagger — wrapping', () => {
     expect(lemmas).not.toContain("vendor's");
     expect(lemmas).toContain('vendor');
   });
+
+  it('never tags brands, acronym plurals, or hostname components (bug-2026-11-11-004)', async () => {
+    const root = article(
+      '<p id="brands">hashes, external IPs, domains and URLs (VirusTotal, abuse.ch, ' +
+        'AbuseIPDB, GreyNoise, urlscan.io) and serendipity</p>',
+    );
+    const tagger = makeTagger();
+    await tagger.scan(root);
+    const lemmas = lemmasIn(root);
+    // Brands and product names (CamelCase).
+    for (const brand of ['virustotal', 'abuseipdb', 'greynoise']) {
+      expect(lemmas).not.toContain(brand);
+    }
+    // Acronym plurals.
+    expect(lemmas).not.toContain('urls');
+    expect(lemmas).not.toContain('ips');
+    // Hostname components (both sides of the dot).
+    expect(lemmas).not.toContain('urlscan');
+    expect(lemmas).not.toContain('io');
+    // Ordinary words in the same sentence still tag normally.
+    expect(lemmas).toContain('hashes');
+    expect(lemmas).toContain('serendipity');
+  });
 });
 
 describe('tagger — skip rules', () => {
