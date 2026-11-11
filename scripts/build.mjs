@@ -19,6 +19,7 @@ const ENTRIES = [
   { entry: 'src/background/service-worker.ts', outFile: 'background/service-worker.js' },
   { entry: 'src/content/index.ts', outFile: 'content/content.js' },
   { entry: 'src/sidepanel/main.ts', outFile: 'sidepanel/main.js' },
+  { entry: 'src/options/main.ts', outFile: 'options/main.js' },
 ];
 
 async function main() {
@@ -64,6 +65,7 @@ function validateManifest(manifestPath) {
   refs.push(...Object.values(manifest.action?.default_icon ?? {}));
   if (manifest.background?.service_worker) refs.push(manifest.background.service_worker);
   if (manifest.side_panel?.default_path) refs.push(manifest.side_panel.default_path);
+  if (manifest.options_ui?.page) refs.push(manifest.options_ui.page);
   for (const cs of manifest.content_scripts ?? []) {
     refs.push(...(cs.js ?? []), ...(cs.css ?? []));
   }
