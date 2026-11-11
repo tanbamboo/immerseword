@@ -217,3 +217,31 @@ merges. Append-only — never rewrite a merged proposal.
 - **Outcome:** fixed in PR-15 (`pr/15-contractions`). Gates: typecheck,
   unit 103/103, e2e 29/29 — contraction sentence (straight and curly
   apostrophes) asserted end-to-end on the live page.
+
+---
+
+## SBFP-006 — transient core-dictionary load failure is cached forever
+
+- **Reported:** 2026-11-11 (`bug-2026-11-11-006`)
+- **Symptom:** after reloading the unpacked extension, chrome://extensions
+  shows: "[ImmerseWord] core dictionary failed to load: TypeError: Failed
+  to fetch" in `background/service-worker.js`.
+- **Root cause:** `corePromise ??= loadCore().catch(...)` caches the
+  rejection's null result for the worker's whole lifetime. A single
+  transient fetch failure — classically the old worker being torn down
+  mid-load when the extension is reloaded, exactly the reported scenario —
+  permanently degrades every later lookup to API-only (or "no definition"
+  when offline). The `console.error` also surfaces in the extension Errors
+  dialog, which is how the user noticed.
+- **Fix:** on load failure, clear `corePromise` so the next lookup retries,
+  and log at `console.warn` ("unavailable, will retry") — transient
+  teardown noise no longer lights up the Errors badge; a genuinely missing
+  file retries cheaply per lookup.
+- **Verification plan:** unit — `loadCore` failing once then succeeding:
+  first lookup degrades (no core), second lookup resolves from core without
+  a worker restart; existing gates green.
+- **Risks / edge cases:** a permanently missing core file now logs a warn
+  per lookup and retries the fetch each time — a packaged-resource fetch,
+  negligible cost.
+- **Outcome:** fixed in PR-16 (`pr/16-core-load-retry`). Gates: typecheck,
+  unit 104/104, e2e 29/29.

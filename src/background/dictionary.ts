@@ -65,10 +65,16 @@ export function createDictionaryService(deps: DictionaryDeps) {
   let lemmatizer: ReturnType<typeof createLemmatizer> | null = null;
 
   const core = (): Promise<CoreDictionary | null> => {
-    corePromise ??= deps.loadCore().catch((err: unknown) => {
-      console.error('[ImmerseWord] core dictionary failed to load:', err);
-      return null;
-    });
+    if (!corePromise) {
+      corePromise = deps.loadCore().catch((err: unknown) => {
+        // Transient fetch failure (e.g. the worker was torn down mid-load
+        // on extension reload): do NOT cache the failure — retry on the
+        // next lookup instead of degrading the worker's whole lifetime.
+        corePromise = null;
+        console.warn('[ImmerseWord] core dictionary unavailable, will retry:', err);
+        return null;
+      });
+    }
     return corePromise;
   };
 
