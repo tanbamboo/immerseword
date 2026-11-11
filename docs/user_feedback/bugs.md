@@ -75,4 +75,17 @@ report's arrival time in session.)*
 > VirusTotal, AbuseIPDB, GreyNoise, urlscan(contain in urlscan.io) as
 > word, these are some product names, brands or domain names.
 
+---
+
+## bug-2026-11-11-005 — contractions tagged as unknown words
+
+**Recorded:** 2026-11-11 15:04 +0800
+**Source:** user report (ZCode session)
+**Status:** fixed — PR-15 (`pr/15-contractions`); see SBFP-005
+
+**Raw report:**
+
+> and it still doesn't work correctly for "you're", "I'm", "you'll", I
+> can't recognize them all
+
 

@@ -136,6 +136,23 @@ describe('tagger — wrapping', () => {
     expect(lemmas).toContain('vendor');
   });
 
+  it('never tags contractions or fixed apostrophe forms (bug-2026-11-11-005)', async () => {
+    const root = article(
+      "<p>You're reading and I'm listening; you'll see it, we can't stop, they won't mind, " +
+        "he don't know, by nine o'clock the ma'am sighed, the vendor's serendipity.</p>",
+    );
+    const tagger = makeTagger();
+    await tagger.scan(root);
+    const lemmas = lemmasIn(root);
+    for (const form of ["you're", 'i\'m', "you'll", "can't", "won't", "don't", "o'clock", "ma'am"]) {
+      expect(lemmas).not.toContain(form);
+    }
+    // Possessives still reduce and tag: vendor's → vendor (unlisted here).
+    expect(lemmas).toContain('vendor');
+    // Ordinary rare words in the same sentence still tag.
+    expect(lemmas).toContain('serendipity');
+  });
+
   it('never tags brands, acronym plurals, or hostname components (bug-2026-11-11-004)', async () => {
     const root = article(
       '<p id="brands">hashes, external IPs, domains and URLs (VirusTotal, abuse.ch, ' +
