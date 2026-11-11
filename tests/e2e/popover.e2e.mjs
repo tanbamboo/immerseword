@@ -37,6 +37,93 @@ function cardText(page) {
 
 export const tests = [
   {
+    name: 'context-menu lookup works for an untagged word (PRD U8)',
+    async run() {
+      await withHarness(async ({ browser, baseUrl }) => {
+        const page = await openArticle(browser, baseUrl);
+        // Select the common word "house" (rank 279 — never tagged at 5k).
+        await page.evaluate(() => {
+          const p = document.getElementById('para-common');
+          const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+          let node = walker.nextNode();
+          while (node && !node.nodeValue.includes('house')) node = walker.nextNode();
+          const idx = node.nodeValue.indexOf('house');
+          const range = document.createRange();
+          range.setStart(node, idx);
+          range.setEnd(node, idx + 'house'.length);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+        });
+        const extensionId = (await import('./harness.mjs')).getExtensionId(browser);
+        const panel = await (await import('./harness.mjs')).openExtensionPage(
+          browser,
+          extensionId,
+          'sidepanel/sidepanel.html',
+        );
+        await page.bringToFront();
+        const response = await panel.evaluate(
+          (lemma) =>
+            new Promise((resolve) => {
+              chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+                if (!tab?.id) return resolve({ error: 'no tab' });
+                chrome.tabs.sendMessage(tab.id, { type: 'IW_SHOW_LOOKUP', lemma }, (resp) =>
+                  resolve(resp ?? { error: chrome.runtime.lastError?.message }),
+                );
+              });
+            }),
+          'house',
+        );
+        assert.equal(response?.shown, true, `any word should be lookup-able: ${JSON.stringify(response)}`);
+        // "house" is in the bundled core dictionary → full entry renders.
+        await page.waitForFunction(
+          () =>
+            document
+              .getElementById('iw-popover-host')
+              ?.shadowRoot?.querySelector('.card .lemma')?.textContent === 'house',
+          { timeout: 10_000 },
+        );
+        await panel.close();
+        await page.close();
+      });
+    },
+  },
+  {
+    name: 'double-clicking an untagged word opens the popover',
+    async run() {
+      await withHarness(async ({ browser, baseUrl }) => {
+        const page = await openArticle(browser, baseUrl);
+        // Headless CDP cannot synthesize a native double-click gesture (the
+        // second click's detail stays 1, so Chrome fires no dblclick), so
+        // reproduce exactly what a real double-click produces: the browser's
+        // word selection plus a bubbling dblclick with detail 2. "evening" is
+        // common (untagged) — only the dblclick path can open the popover.
+        await page.evaluate(() => {
+          const p = document.getElementById('para-common');
+          const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+          let node = walker.nextNode();
+          while (node && !node.nodeValue.includes('evening')) node = walker.nextNode();
+          const idx = node.nodeValue.indexOf('evening');
+          const range = document.createRange();
+          range.setStart(node, idx);
+          range.setEnd(node, idx + 'evening'.length);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+        });
+        await page.waitForFunction(
+          () =>
+            document
+              .getElementById('iw-popover-host')
+              ?.shadowRoot?.querySelector('.card .lemma')?.textContent === 'evening',
+          { timeout: 10_000 },
+        );
+        await page.close();
+      });
+    },
+  },
+  {
     name: 'context-menu path: IW_SHOW_LOOKUP opens the popover for the word',
     async run() {
       await withHarness(async ({ browser, baseUrl }) => {

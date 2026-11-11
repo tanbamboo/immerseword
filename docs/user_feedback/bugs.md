@@ -23,3 +23,19 @@ Analysis and fixes live in [../sbfp_logs.md](../sbfp_logs.md).
 
 *(Entry recorded retroactively when this log was created; timestamp is the
 report's arrival time in session.)*
+
+---
+
+## bug-2026-11-11-002 — context-menu lookup and double-click show no popover
+
+**Recorded:** 2026-11-11 13:46 +0800
+**Source:** user report (ZCode session)
+**Status:** fixed — PR-12 (`pr/12-lookup-any-word`); see SBFP-002
+
+**Raw report:**
+
+> when I use the extension, it doesn't work when right click the selected
+> word and select "Look up xxxx from ImmerseWord" from the right menu, there
+> aren't any popup window displayed; and double clicking the word also
+> doesn't work.
+

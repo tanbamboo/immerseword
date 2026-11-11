@@ -78,7 +78,7 @@ export function createPopover(deps: PopoverDeps) {
   document.documentElement.append(host);
 
   let currentLemma: string | null = null;
-  let currentSpan: HTMLElement | null = null;
+  let currentAnchor: HTMLElement | Range | null = null;
   let lookupSeq = 0;
 
   function renderLoading(lemma: string): void {
@@ -90,7 +90,8 @@ export function createPopover(deps: PopoverDeps) {
     card.style.display = 'block';
   }
 
-  function position(near: HTMLElement | null): void {
+  /** Anchors: a tagged span (click path) or the selection rect (U8 lookup path). */
+  function position(near: HTMLElement | Range | null): void {
     const rect = near?.getBoundingClientRect();
     const vw = window.innerWidth;
     const vh = window.innerHeight;
@@ -174,7 +175,7 @@ export function createPopover(deps: PopoverDeps) {
     }
 
     card.style.display = 'block';
-    position(currentSpan);
+    position(currentAnchor);
   }
 
   function renderNoDefinition(lemma: string): void {
@@ -186,7 +187,7 @@ export function createPopover(deps: PopoverDeps) {
     const row = statusRow();
     card.append(row);
     card.style.display = 'block';
-    position(currentSpan);
+    position(currentAnchor);
   }
 
   function statusRow(): HTMLElement {
@@ -213,12 +214,12 @@ export function createPopover(deps: PopoverDeps) {
     });
   }
 
-  async function openFor(span: HTMLElement | null, lemma: string): Promise<void> {
-    currentSpan = span;
+  async function openFor(anchor: HTMLElement | Range | null, lemma: string): Promise<void> {
+    currentAnchor = anchor;
     currentLemma = lemma;
     const seq = ++lookupSeq;
     renderLoading(lemma);
-    position(span);
+    position(anchor);
 
     const [result, entry] = await Promise.all([
       deps.lookup(lemma),
@@ -236,7 +237,7 @@ export function createPopover(deps: PopoverDeps) {
 
   function closePopover(): void {
     currentLemma = null;
-    currentSpan = null;
+    currentAnchor = null;
     lookupSeq++;
     card.style.display = 'none';
     card.innerHTML = '';
@@ -247,7 +248,10 @@ export function createPopover(deps: PopoverDeps) {
   function onDocClick(event: Event): void {
     if (!isOpen()) return;
     const path = event.composedPath();
-    if (!path.includes(host) && !path.includes(currentSpan ?? host)) closePopover();
+    // A Range anchor never appears in a composed path — only elements do.
+    if (!path.includes(host) && !(currentAnchor instanceof HTMLElement && path.includes(currentAnchor))) {
+      closePopover();
+    }
   }
 
   function onKey(event: KeyboardEvent): void {

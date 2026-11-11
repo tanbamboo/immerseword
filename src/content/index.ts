@@ -13,6 +13,7 @@ import { createReader, canRead, DEFAULT_READER_PREFS, type ReaderPrefs } from '.
 import { createFrequencyIndex } from '../shared/frequency';
 import { createLemmatizer } from '../shared/lemmatizer';
 import { getSettings, type SyncStorageLike } from '../shared/settings';
+import { tokenize, isAcronym } from '../shared/tokenizer';
 import { createVocabStore, type VocabStore } from '../shared/vocab';
 import {
   DEFAULT_SETTINGS,
@@ -31,6 +32,14 @@ let vocab: VocabStore | null = null;
 let currentSettings: IwSettings = DEFAULT_SETTINGS;
 let rescanTimer: ReturnType<typeof setTimeout> | null = null;
 let readerToggleRef: (() => void) | null = null;
+let popoverRef: ReturnType<typeof createPopover> | null = null;
+
+/** The current selection as a popover anchor (null → viewport-centered card). */
+function selectionRange(): Range | null {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+  return sel.getRangeAt(0);
+}
 
 async function loadFrequencyWords(): Promise<string[]> {
   try {
@@ -101,6 +110,7 @@ async function init(): Promise<void> {
         .catch(() => undefined);
     },
   });
+  popoverRef = popover;
 
   // Immersive reader (ADR-0006): on-demand overlay, tagging re-scans the
   // extracted article inside the shadow root.
@@ -153,6 +163,24 @@ async function init(): Promise<void> {
       void popover.openFor(span, span.dataset.lemma);
     }
   }, true);
+
+  // Double-click lookup (PRD F2): the browser's native word selection is
+  // looked up directly — untagged words included, tagging off included (U8).
+  document.addEventListener('dblclick', (event) => {
+    for (const target of event.composedPath()) {
+      if (!(target instanceof Element)) continue;
+      // Our own popover card and editing/form surfaces are not word lookups.
+      if (target.id === 'iw-popover-host') return;
+      if (target.matches('input, textarea, select, button, [contenteditable="true"], [contenteditable=""]')) {
+        return;
+      }
+      // Tagged words ride the single-click path — skip the second lookup.
+      if (target.closest('span.iw-word')) return;
+    }
+    const word = tokenize(String(window.getSelection() ?? ''))[0]?.text;
+    if (!word || isAcronym(word)) return;
+    void popoverRef?.openFor(selectionRange(), word.toLowerCase());
+  });
 
   if (currentSettings.taggingEnabled) {
     void tagger.scan(document.body);
@@ -252,17 +280,25 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
     return false;
   }
   if (msg?.type === 'IW_SHOW_LOOKUP') {
-    // Context-menu lookup: find the first tagged occurrence of the lemma.
+    // Context-menu lookup (PRD U8): ANY word is lookup-able, not only tagged
+    // ones — a tagged occurrence anchors and scrolls; otherwise the popover
+    // rides the selection rect.
+    const lemma = (tokenize(msg.lemma)[0]?.text ?? '').toLowerCase();
+    if (!lemma) {
+      sendResponse({ shown: false });
+      return false;
+    }
     const span = document.querySelector<HTMLElement>(
-      `span.iw-word[data-lemma="${CSS.escape(msg.lemma.toLowerCase())}"]`,
+      `span.iw-word[data-lemma="${CSS.escape(lemma)}"]`,
     );
-    const lemma = msg.lemma.toLowerCase();
     if (span) {
       span.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      // Popover opens via the synthetic click path by re-dispatching on the span.
+      span.click();
+    } else {
+      void popoverRef?.openFor(selectionRange(), lemma);
     }
-    // Popover opens via the synthetic click path by re-dispatching on the span.
-    if (span) span.click();
-    sendResponse({ shown: !!span });
+    sendResponse({ shown: true });
     return false;
   }
   if (msg?.type === 'SESSION_UPDATED') {
