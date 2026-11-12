@@ -22,7 +22,7 @@ const STYLE = `
   * { box-sizing: border-box; }
   .card {
     position: fixed; z-index: 2147483647;
-    width: 380px; max-width: calc(100vw - 24px);
+    width: 480px; max-width: calc(100vw - 24px);
     background: #fffdf8; color: #1f2933;
     border: 1px solid #d9d4c8; border-radius: 12px;
     box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
@@ -130,7 +130,7 @@ export function createPopover(deps: PopoverDeps) {
     card.style.top = `${Math.max(8, y)}px`;
   }
 
-  /** Head row: lemma, the SIP-003 "+" recorder, phonetic, close. */
+  /** Head row: lemma, phonetic, the SIP-003 "+" recorder, close. */
   function headRow(displayLemma: string, phonetic?: string): HTMLElement {
     const head = document.createElement('div');
     head.className = 'head';
@@ -138,13 +138,13 @@ export function createPopover(deps: PopoverDeps) {
     lemmaEl.className = 'lemma';
     lemmaEl.textContent = displayLemma;
     head.append(lemmaEl);
-    if (currentAnchor) head.append(addButton());
     if (phonetic) {
       const phon = document.createElement('span');
       phon.className = 'phon';
       phon.textContent = phonetic;
       head.append(phon);
     }
+    if (currentAnchor) head.append(addButton()); // after the IPA when shown (SIP-004)
     const close = document.createElement('button');
     close.className = 'close';
     close.setAttribute('aria-label', 'Close');
@@ -382,6 +382,11 @@ export function createPopover(deps: PopoverDeps) {
 
   const isOpen = (): boolean => card.style.display === 'block';
 
+  /** SIP-004: inline width overrides the stylesheet default (setting-driven). */
+  function setWidth(px: number): void {
+    card.style.width = `${px}px`;
+  }
+
   function onDocClick(event: Event): void {
     if (!isOpen()) return;
     const path = event.composedPath();
@@ -402,6 +407,7 @@ export function createPopover(deps: PopoverDeps) {
     openFor,
     close: closePopover,
     isOpen,
+    setWidth,
     /** Test seam: the shadow card element. */
     _card: card,
   };

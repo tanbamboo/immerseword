@@ -48,3 +48,15 @@ Analysis and implementation live in [../sip_logs.md](../sip_logs.md).
 > increased to display example sentences. and in the example sentences,
 > the word should be highlighted.
 
+## feat-2026-11-12-003 — popover width: 480 px default and a settings choice; "+" after the IPA
+
+**Recorded:** 2026-11-12 16:14 +0800
+**Source:** user request (ZCode session)
+**Status:** implemented — PR-20 (`pr/20-popover-width-setting`); see SIP-004
+
+**Raw request:**
+
+> popover window is still not wide enough, maybe increase to 480 px? or we
+> can let user make the choice in settings, such as 3 options(320px, 480px,
+> 640px)? and the "+" button should after the IPA when it's availble.
+
