@@ -98,6 +98,8 @@ export function createPopover(deps: PopoverDeps) {
   document.documentElement.append(host);
 
   let currentLemma: string | null = null;
+  /** Vocabulary key (canonical lemma — may differ from the display word). */
+  let currentVocabKey: string | null = null;
   let currentAnchor: HTMLElement | Range | null = null;
   let lookupSeq = 0;
 
@@ -167,7 +169,7 @@ export function createPopover(deps: PopoverDeps) {
   }
 
   async function onAddExample(btn: HTMLButtonElement): Promise<void> {
-    const lemma = currentLemma;
+    const lemma = currentVocabKey ?? currentLemma;
     if (!lemma) return;
     if (await captureExample(lemma)) flashDone(btn);
   }
@@ -263,7 +265,7 @@ export function createPopover(deps: PopoverDeps) {
     }
 
     if (vocabEntry?.examples?.length) {
-      card.append(metSection(lemma, vocabEntry.examples));
+      card.append(metSection(currentVocabKey ?? lemma, vocabEntry.examples));
     }
 
     const row = document.createElement('div');
@@ -297,7 +299,7 @@ export function createPopover(deps: PopoverDeps) {
     state.textContent = `No monolingual definition found for “${lemma}”.`;
     card.append(state);
     if (vocabEntry?.examples?.length) {
-      card.append(metSection(lemma, vocabEntry.examples));
+      card.append(metSection(currentVocabKey ?? lemma, vocabEntry.examples));
     }
     const row = statusRow();
     card.append(row);
@@ -319,7 +321,7 @@ export function createPopover(deps: PopoverDeps) {
   }
 
   async function onStatus(status: WordStatus): Promise<void> {
-    const lemma = currentLemma;
+    const lemma = currentVocabKey ?? currentLemma;
     if (!lemma) return;
     await deps.vocab.setStatus(lemma, status);
     deps.onStatusChange?.(lemma, status);
@@ -351,16 +353,27 @@ export function createPopover(deps: PopoverDeps) {
     card.querySelector('.status-row')?.before(metSection(lemma, examples));
   }
 
-  async function openFor(anchor: HTMLElement | Range | null, lemma: string): Promise<void> {
+  /**
+   * `lemma` is the display word (drives the dictionary lookup);
+   * `vocabKey` is the canonical form all vocabulary state keys — the
+   * dblclick/context-menu paths resolve it via the frequency index, because
+   * the tagger tags e.g. "evening" under lemma "even" (bug-2026-11-12-001).
+   */
+  async function openFor(
+    anchor: HTMLElement | Range | null,
+    lemma: string,
+    vocabKey?: string,
+  ): Promise<void> {
     currentAnchor = anchor;
     currentLemma = lemma;
+    currentVocabKey = vocabKey ?? lemma;
     const seq = ++lookupSeq;
     renderLoading(lemma);
     position(anchor);
 
     const [result, entry] = await Promise.all([
       deps.lookup(lemma),
-      deps.vocab.getEntry(lemma),
+      deps.vocab.getEntry(currentVocabKey),
     ]);
     if (seq !== lookupSeq || currentLemma !== lemma) return; // superseded or closed
 
@@ -369,11 +382,12 @@ export function createPopover(deps: PopoverDeps) {
     } else {
       renderNoDefinition(lemma, entry);
     }
-    void deps.vocab.bumpLookup(lemma).catch(() => undefined);
+    void deps.vocab.bumpLookup(currentVocabKey).catch(() => undefined);
   }
 
   function closePopover(): void {
     currentLemma = null;
+    currentVocabKey = null;
     currentAnchor = null;
     lookupSeq++;
     card.style.display = 'none';

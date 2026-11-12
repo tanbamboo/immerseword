@@ -245,3 +245,75 @@ merges. Append-only — never rewrite a merged proposal.
   negligible cost.
 - **Outcome:** fixed in PR-16 (`pr/16-core-load-retry`). Gates: typecheck,
   unit 104/104, e2e 29/29.
+
+---
+
+## SBFP-007 — classifying a double-clicked common word never tags it
+
+- **Reported:** 2026-11-12 (`bug-2026-11-12-001`)
+- **Symptom:** double-click a word that is *not* a candidate (common, inside
+  the level band — never wrapped by the tagger), classify it **Learning** or
+  **Unknown** in the popover → nothing happens on the page. The word is never
+  tagged or underlined, contradicting PRD F1 and ADR-0003 ("learning/unknown —
+  always shown"). Tagged (candidate) words classify fine.
+- **Root cause (three layers):**
+  1. `Tagger.classify` checks the frequency band **before** the personal
+     vocabulary: a within-band token returns `null` early, so a `learning`/
+     `unknown` status can never produce a tag — the personal layer was meant
+     to *override* the band (ADR-0003 layer 2), but only did so for words
+     that were already rare.
+  2. Even with (1) fixed, the word's text node was consumed by the initial
+     scan (`processed` set), and `refreshStatus` only mutates existing
+     `span.iw-word` elements — nothing re-examines already-processed nodes,
+     so the new status never materializes as a span.
+  3. The dblclick/context-menu lookup paths classify under the **raw
+     surface** ("evening"), while the tagger's vocab key is the canonical
+     resolved form — `resolveForm("evening")` = "even" (rank 2352 vs 253:
+     the lemma outranks the surface, so it wins per `frequency.ts`). The
+     keys never meet, so even (1)+(2) left the word untagged. Tagged-span
+     popovers never hit this — their `data-lemma` is already canonical.
+- **Evidence:** `src/content/tagger.ts` `classify` (band check at the
+  `isRarerThan` guard precedes `vocab.statusOf`); `refreshStatus` queries
+  existing spans only; `collectTextNodes` rejects `processed` nodes;
+  `public/data/frequency.json` ranks evening=2352, even=253 →
+  `resolveForm` returns the lemma. Repro in e2e conditions: dblclick
+  "evening" → Learning → zero matching spans on the page.
+- **Fix:**
+  - `classify` reordered to honor ADR-0003's layering: acronym/brand/
+    contraction guards first, resolve the lemma, then **vocab status before
+    the band check** — `known`/`ignored` → null, `learning`/`unknown` → tag
+    with that status regardless of band; only then the candidate band check.
+  - New `Tagger.rescan(root)`: same batched loop as `scan`, but
+    re-examines already-processed nodes too (wrapping is idempotent —
+    wrapped tokens were split off the node, so no double-wrapping).
+  - `content/index.ts`: on any classification to `learning`/`unknown`
+    (popover path and side-panel `storage.onChanged` path), `rescan` the
+    page body and the reader's live article so all occurrences — including
+    previously untagged common ones — get wrapped; per-root scan
+    invalidation makes overlapping calls safe.
+  - `content/popover.ts`: `openFor` gains an optional `vocabKey` — the
+    display word still drives the dictionary lookup ("evening" keeps its
+    own definition), while every vocabulary interaction (status, examples,
+    `onStatusChange`) keys the canonical form. The content script resolves
+    it via the frequency index for the dblclick and context-menu paths.
+- **Verification plan:** unit — classify returns `learning`/`unknown` for a
+  within-band word with a vocab status; scan initially skips it, `rescan`
+  after the status lands wraps it (and inflected surfaces share the lemma);
+  known/ignored still never tag; popover classifies under `vocabKey` while
+  looking up the display word. e2e — dblclick "evening" → Learning → a
+  `span.iw-word` with the canonical lemma `even` and status `learning`
+  appears wrapping exactly the word "evening"; existing gates green.
+- **Risks / edge cases:** `classify` now resolves a lemma for every token
+  (previously only rare ones) — one extra Map lookup per token inside
+  already batched scans, negligible; contractions stay untaggable (the
+  apostrophe guard runs before the vocab check, preserving bug-2026-11-11-005);
+  classifying from the side panel now also triggers a rescan (cheap, and
+  correct — same requirement); words inside links/code stay untouchable
+  (skip filter unchanged); the `vocabKey` split means a dblclicked word
+  whose canonical lemma differs ("evening" → "even") classifies under the
+  canonical lemma — exactly how the tagger already treats those tokens.
+- **Outcome:** fixed in PR-22 (`pr/22-tag-classified-common-words`). Gates:
+  typecheck, unit 136/136, e2e 36/36. Layer 3 (the lemma-key mismatch) only
+  surfaced when the first e2e run of the repro stayed red after layers 1–2 —
+  the fix was extended with the popover `vocabKey` and verified with the
+  real-corpus ranks (evening 2352 / even 253).
