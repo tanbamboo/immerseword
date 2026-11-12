@@ -578,4 +578,68 @@ export const tests = [
       });
     },
   },
+  {
+    name: 'classifying a double-clicked common word tags it immediately (bug-2026-11-12-001)',
+    async run() {
+      await withHarness(async ({ browser, baseUrl }) => {
+        const page = await openArticle(browser, baseUrl);
+        const watcher = watchPage(page, 'fixture');
+
+        // "evening" is common (never tagged); the dblclick path is the only
+        // way in. Reproduce a real double-click: word selection + detail 2.
+        await page.evaluate(() => {
+          const p = document.getElementById('para-common');
+          const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+          let node = walker.nextNode();
+          while (node && !node.nodeValue.includes('evening')) node = walker.nextNode();
+          const idx = node.nodeValue.indexOf('evening');
+          const range = document.createRange();
+          range.setStart(node, idx);
+          range.setEnd(node, idx + 'evening'.length);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          p.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+        });
+        await page.waitForFunction(
+          () =>
+            document
+              .getElementById('iw-popover-host')
+              ?.shadowRoot?.querySelector('.card .status-row button') !== null,
+          { timeout: 10_000 },
+        );
+        assert.equal(
+          await page.evaluate(
+            () => document.querySelectorAll('span.iw-word[data-lemma="evening"]').length,
+          ),
+          0,
+          'common word is untagged before classification',
+        );
+
+        await page.evaluate(() => {
+          const card = document.getElementById('iw-popover-host').shadowRoot.querySelector('.card');
+          card.querySelector('button[data-status="learning"]').click();
+        });
+        // The tagger keys vocabulary by canonical lemma: "evening" (rank 2352)
+        // resolves to "even" (rank 253) — the span carries that lemma while
+        // wrapping exactly the "evening" occurrence.
+        await page.waitForFunction(
+          () =>
+            [...document.querySelectorAll('span.iw-word[data-lemma="even"]')].some(
+              (s) => s.dataset.iwStatus === 'learning' && s.textContent === 'evening',
+            ),
+          { timeout: 10_000 },
+        );
+        const info = await page.evaluate(() => {
+          const span = [...document.querySelectorAll('span.iw-word[data-lemma="even"]')].find(
+            (s) => s.textContent === 'evening',
+          );
+          return { underlined: getComputedStyle(span).textDecorationLine !== 'none' };
+        });
+        assert.ok(info.underlined, 'the learning tag is underlined');
+        watcher.assertClean();
+        await page.close();
+      });
+    },
+  },
 ];

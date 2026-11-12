@@ -33,6 +33,33 @@ let currentSettings: IwSettings = DEFAULT_SETTINGS;
 let rescanTimer: ReturnType<typeof setTimeout> | null = null;
 let readerToggleRef: (() => void) | null = null;
 let popoverRef: ReturnType<typeof createPopover> | null = null;
+/** The reader's live shadow-root article, when open — a second scan root. */
+let readerArticle: HTMLElement | null = null;
+/**
+ * Surface → canonical vocab key (the frequency index's resolved form). The
+ * dblclick/context-menu paths classify words the tagger never wrapped, and
+ * the tagger keys vocabulary by canonical lemma ("evening" → "even"), so the
+ * popover must too (bug-2026-11-12-001). Null until init builds the index.
+ */
+let resolveWordKey: ((word: string) => string) | null = null;
+/** Sync snapshot for the tagger's synchronous classification; kept fresh by
+ *  the storage.onChanged listener and every popover classification. */
+const statusMap = new Map<string, WordStatus>();
+
+/**
+ * A classification landed (popover here or another context). Beyond
+ * re-marking existing spans, learning/unknown words must be TAGGED
+ * everywhere — including occurrences the initial scan skipped as common
+ * (bug-2026-11-12-001) — so re-examine the page and the reader article.
+ * Per-root scan invalidation makes overlapping calls safe.
+ */
+function onVocabClassified(lemma: string, status: WordStatus | 'candidate'): void {
+  tagger?.refreshStatus(lemma, status);
+  if ((status === 'learning' || status === 'unknown') && currentSettings.taggingEnabled) {
+    void tagger?.rescan(document.body);
+    if (readerArticle) void tagger?.rescan(readerArticle);
+  }
+}
 
 /** The current selection as a popover anchor (null → viewport-centered card). */
 function selectionRange(): Range | null {
@@ -87,9 +114,6 @@ async function init(): Promise<void> {
   if (words.length === 0) return; // degraded: no tagging, messaging still works
 
   vocab = createVocabStore(chrome.storage.local);
-  // Sync snapshot for the tagger's synchronous classification; kept fresh
-  // by the storage.onChanged listener below.
-  const statusMap = new Map<string, WordStatus>();
   for (const [lemma, entry] of Object.entries(await vocab.all())) {
     statusMap.set(lemma, entry.status);
   }
@@ -97,6 +121,7 @@ async function init(): Promise<void> {
   const known = new Set(words);
   const lemmatizer = createLemmatizer({ knownLemmas: known });
   const index = createFrequencyIndex(words, (s) => lemmatizer.lemma(s));
+  resolveWordKey = (word) => index.resolveForm(word);
   tagger = createTagger({ frequency: index, settings: currentSettings });
   tagger.setVocab({ statusOf: (lemma) => statusMap.get(lemma) });
 
@@ -106,7 +131,7 @@ async function init(): Promise<void> {
     isWordForm: (lemma, token) => lemmatizer.lemma(token.toLowerCase()) === lemma,
     onStatusChange: (lemma, status) => {
       statusMap.set(lemma, status);
-      tagger?.refreshStatus(lemma, status);
+      onVocabClassified(lemma, status);
       void chrome.runtime
         .sendMessage({ type: 'SESSION_WORD_CLASSIFIED', lemma, status } satisfies IwMessage)
         .catch(() => undefined);
@@ -122,6 +147,7 @@ async function init(): Promise<void> {
     prefs: readerPrefs,
     onPrefsChange: (next) => void saveReaderPrefs(next),
     onArticleReady: (articleEl) => {
+      readerArticle = articleEl;
       if (currentSettings.taggingEnabled) void tagger?.scan(articleEl);
     },
   });
@@ -182,7 +208,8 @@ async function init(): Promise<void> {
     }
     const word = tokenize(String(window.getSelection() ?? ''))[0]?.text;
     if (!word || isAcronym(word)) return;
-    void popoverRef?.openFor(selectionRange(), word.toLowerCase());
+    const surface = word.toLowerCase();
+    void popoverRef?.openFor(selectionRange(), surface, resolveWordKey?.(surface));
   });
 
   if (currentSettings.taggingEnabled) {
@@ -266,7 +293,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
   const next = (changes['iw:vocab'].newValue ?? {}) as Record<string, { status: WordStatus }>;
   for (const lemma of new Set([...Object.keys(prev), ...Object.keys(next)])) {
     if (prev[lemma]?.status !== next[lemma]?.status) {
-      tagger.refreshStatus(lemma, next[lemma]?.status ?? 'candidate');
+      const status = next[lemma]?.status ?? 'candidate';
+      if (status !== 'candidate') statusMap.set(lemma, status);
+      onVocabClassified(lemma, status);
       void chrome.runtime
         .sendMessage({
           type: 'SESSION_WORD_CLASSIFIED',
@@ -316,7 +345,7 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
       // Popover opens via the synthetic click path by re-dispatching on the span.
       span.click();
     } else {
-      void popoverRef?.openFor(selectionRange(), lemma);
+      void popoverRef?.openFor(selectionRange(), lemma, resolveWordKey?.(lemma));
     }
     sendResponse({ shown: true });
     return false;

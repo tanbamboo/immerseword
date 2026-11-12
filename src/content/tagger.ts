@@ -135,7 +135,6 @@ export function createTagger(options: TaggerOptions) {
   function classify(text: string): { lemma: string; status: TagStatus } | null {
     if (isAcronym(text)) return null;
     if (isBrandLike(text)) return null; // brands/products ("VirusTotal"), acronym plurals ("URLs")
-    if (!options.frequency.isRarerThan(text, settings.level)) return null; // within band → common
     // The vocabulary key is whichever form the rank resolver settled on:
     // a common surface beats a bogus rare lemma ("family" ≠ "fam").
     const lemma = options.frequency.resolveForm(text);
@@ -143,13 +142,18 @@ export function createTagger(options: TaggerOptions) {
     // "o'clock") that no analysis can rank — the lemma still carries the
     // apostrophe — are function words / fixed forms, not vocabulary.
     if (/['’]/.test(lemma) && options.frequency.rank(lemma) === 0) return null;
+    // Personal vocabulary OVERRIDES the band (ADR-0003 layer 2): learning and
+    // unknown words are always shown — even when the surface is common
+    // (bug-2026-11-12-001) — and known/ignored are never shown.
     const status = vocab?.statusOf(lemma);
     if (status === 'known' || status === 'ignored') return null;
-    return { lemma, status: status ?? 'candidate' };
+    if (status === 'learning' || status === 'unknown') return { lemma, status };
+    if (!options.frequency.isRarerThan(text, settings.level)) return null; // within band → common
+    return { lemma, status: 'candidate' };
   }
 
-  /** Text nodes under `root`, skipping banned subtrees and processed nodes. */
-  function collectTextNodes(root: ParentNode): Text[] {
+  /** Text nodes under `root`, skipping banned subtrees and (by default) processed nodes. */
+  function collectTextNodes(root: ParentNode, opts?: { includeProcessed?: boolean }): Text[] {
     // Opportunistic pruning: drop entries for nodes the page has removed so
     // SPA churn cannot grow the set without bound.
     if (processed.size > 2_000) {
@@ -162,7 +166,7 @@ export function createTagger(options: TaggerOptions) {
         const parent = node.parentElement;
         if (!parent) return NodeFilter.FILTER_REJECT;
         if (parent.closest(SKIP_SELECTOR)) return NodeFilter.FILTER_REJECT;
-        if (processed.has(node as Text)) return NodeFilter.FILTER_REJECT;
+        if (!opts?.includeProcessed && processed.has(node as Text)) return NodeFilter.FILTER_REJECT;
         const value = node.nodeValue ?? '';
         if (!/[A-Za-z]{2}/.test(value)) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
@@ -229,10 +233,23 @@ export function createTagger(options: TaggerOptions) {
   }
 
   async function scan(root: ParentNode): Promise<number> {
+    return runScan(root, collectTextNodes(root));
+  }
+
+  /**
+   * Re-examines already-processed nodes too (bug-2026-11-12-001): once a
+   * word is classified learning/unknown, its occurrences — including
+   * previously common, untagged ones — must become tags. Idempotent:
+   * wrapped tokens were split off their text nodes, so nothing double-wraps.
+   */
+  async function rescan(root: ParentNode): Promise<number> {
+    return runScan(root, collectTextNodes(root, { includeProcessed: true }));
+  }
+
+  async function runScan(root: ParentNode, nodes: Text[]): Promise<number> {
     const token = (scanTokens.get(root) ?? 0) + 1;
     scanTokens.set(root, token);
     const currentToken = () => scanTokens.get(root);
-    const nodes = collectTextNodes(root);
     let total = 0;
 
     for (let i = 0; i < nodes.length; i += batchSize) {
@@ -288,5 +305,5 @@ export function createTagger(options: TaggerOptions) {
       });
   }
 
-  return { scan, untag, applySettings, setVocab, refreshStatus, classify };
+  return { scan, rescan, untag, applySettings, setVocab, refreshStatus, classify };
 }

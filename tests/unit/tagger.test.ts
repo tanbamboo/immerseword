@@ -283,3 +283,47 @@ describe('tagger — untag', () => {
     expect(root.querySelector('p')?.childNodes.length).toBe(1); // single clean text node
   });
 });
+
+describe('tagger — personal vocabulary overrides the band (bug-2026-11-12-001)', () => {
+  it('classify returns the vocab status for a within-band word', () => {
+    const tagger = makeTagger({
+      vocab: { statusOf: (lemma) => (lemma === 'house' ? 'learning' : undefined) },
+    });
+    expect(tagger.classify('house')).toEqual({ lemma: 'house', status: 'learning' });
+    // Inflected surfaces share the lemma.
+    expect(tagger.classify('houses')).toEqual({ lemma: 'house', status: 'learning' });
+  });
+
+  it('known and ignored never tag, rare or common', () => {
+    const known = makeTagger({ vocab: { statusOf: () => 'known' } });
+    expect(known.classify('house')).toBeNull(); // common
+    expect(known.classify('serendipity')).toBeNull(); // rare
+    const ignored = makeTagger({ vocab: { statusOf: () => 'ignored' } });
+    expect(ignored.classify('observe')).toBeNull();
+  });
+
+  it('scan wraps a within-band word as soon as its vocab status says so', async () => {
+    const root = article('<p>The house stood near the road.</p>');
+    const tagger = makeTagger({
+      vocab: { statusOf: (lemma) => (lemma === 'house' ? 'learning' : undefined) },
+    });
+    expect(await tagger.scan(root)).toBe(1);
+    const span = root.querySelector<HTMLElement>('span.iw-word[data-lemma="house"]');
+    expect(span?.dataset.iwStatus).toBe('learning');
+    expect(span?.textContent).toBe('house');
+  });
+
+  it('rescan re-examines processed nodes once a classification lands', async () => {
+    const root = article('<p>The house stood near the road.</p>');
+    const statuses = new Map<string, WordStatus>();
+    const tagger = makeTagger({ vocab: { statusOf: (lemma) => statuses.get(lemma) } });
+
+    expect(await tagger.scan(root)).toBe(0); // common → untouched, node processed
+    expect(lemmasIn(root)).toEqual([]);
+
+    statuses.set('house', 'unknown'); // classified later (popover dblclick path)
+    expect(await tagger.rescan(root)).toBe(1);
+    expect(lemmasIn(root)).toEqual(['house']); // exactly one span — nothing double-wrapped
+    expect(root.querySelector<HTMLElement>('span.iw-word')?.dataset.iwStatus).toBe('unknown');
+  });
+});

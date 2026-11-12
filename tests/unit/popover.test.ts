@@ -271,4 +271,24 @@ describe('popover', () => {
     expect(popover._card.style.width).toBe('640px');
     popover.close();
   });
+
+  it('classifies under the canonical vocab key while looking up the display word (bug-2026-11-12-001)', async () => {
+    document.body.innerHTML = '<p>The <span class="iw-word">evening</span> fell.</p>';
+    const span = document.querySelector('span.iw-word') as HTMLElement;
+    const vocab = createVocabStore(fakeStorage());
+    const onStatusChange = vi.fn();
+    const lookup = vi.fn(async () => ({ entry: ENTRY, source: 'core' }));
+    const popover = createPopover({ lookup, vocab, onStatusChange });
+
+    await popover.openFor(span, 'evening', 'even'); // dblclick-style: surface vs canonical key
+    expect(lookup).toHaveBeenCalledWith('evening'); // display word drives the dictionary lookup
+
+    popover._card.querySelector<HTMLButtonElement>('button[data-status="learning"]')!.click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(await vocab.statusOf('even')).toBe('learning');
+    expect(await vocab.statusOf('evening')).toBeUndefined();
+    expect(onStatusChange).toHaveBeenCalledWith('even', 'learning');
+    popover.close();
+  });
 });

@@ -106,4 +106,16 @@ report's arrival time in session.)*
 > [ImmerseWord] core dictionary failed to load: TypeError: Failed to fetch
 > `background/service-worker.js` (anonymous function) — 1 error
 
+## bug-2026-11-12-001 — classifying a double-clicked common word never tags it
+
+**Recorded:** 2026-11-12 17:06 +0800
+**Source:** user report (ZCode session)
+**Status:** fixed — PR-22 (`pr/22-tag-classified-common-words`); see SBFP-007
+
+**Raw report:**
+
+> after I double click to query the definition of a word which is not a
+> candidate, the word is not been tagged, no matter I choose "Learning" or
+> "Unknown". it should be tagged and underlined.
+
 
