@@ -190,3 +190,47 @@ PR merges. Append-only — never rewrite a merged proposal.
   so the recorder lives in one predictable place; highlighting is
   display-side only, so examples recorded before this change highlight
   too.
+
+## SIP-004 — configurable popover width (320/480/640, default 480); "+" after the IPA
+
+- **Requested:** 2026-11-12 (`feat-2026-11-12-003`)
+- **Motivation:** SIP-003's 380 px card still feels "not wide enough"
+  for example sentences, and different screens/reading habits want
+  different sizes — the reporter suggests both a bigger default and a
+  user choice. Also, the "+" recorder sits between the word and its
+  IPA, splitting the headword pair; it should follow the IPA when one
+  is shown.
+- **Scope:**
+  1. New setting `popoverWidth: 320 | 480 | 640` (default **480**,
+     up from 380) as a select on the options page, applied live via
+     `chrome.storage.onChanged` — same recipe as `tagStyle` (SIP-001).
+  2. Head order: `word · IPA · [+] · ✕` (the `+` moves after the IPA
+     when available; unchanged `word · [+] · ✕` otherwise).
+- **UX sketch:**
+  - options → Appearance: "Popover width — Compact 320 px /
+    Default 480 px / Wide 640 px"
+  - `serendipity /sɜːrəpənˈɪti/ [+]                     ✕`
+- **Technical approach:**
+  - `IwSettings.popoverWidth` in `src/shared/types.ts` with default
+    480; select row in `public/options/options.html`; read/write in
+    `src/options/main.ts` (`refresh`/`bindSettings`).
+  - `createPopover` returns `setWidth(px)` setting an inline
+    `card.style.width` (overrides the stylesheet default), so the
+    content script applies the setting at init and on sync-storage
+    changes; the responsive `max-width: calc(100vw - 24px)` clamp is
+    untouched.
+  - `headRow` appends the `+` button after the phonetic span.
+- **Test plan:** unit — defaults carry 480; head child order is
+  lemma → phon → add (and lemma → add without IPA); `setWidth`
+  changes the card's inline width. e2e — default card computes
+  480 px; switching the setting to 640 via storage updates the next
+  popover without a reload; existing gates green.
+- **Risks:** 640 px on small viewports still clamps (max-width);
+  inline width survives popover re-renders because the card element
+  itself is never replaced.
+- **Docs:** PRD F2 width bullet (configurable, default 480) + F6
+  settings row; ADR-0001 amendment (popover appearance configurable).
+- **Outcome:** implemented in PR-20 (`pr/20-popover-width-setting`).
+  Gates: typecheck, unit 131/131, e2e 35/35. The SIP-001 tag-style
+  e2e's hand-built settings payload was extended with the new field so
+  it keeps writing a complete settings object.

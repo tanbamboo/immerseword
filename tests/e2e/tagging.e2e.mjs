@@ -219,7 +219,7 @@ export const tests = [
             chrome.storage.sync.set({
               'iw:settings': {
                 level: '5k', taggingEnabled: true, pass1ShowMarks: false,
-                onlineFallback: true, tagStyle: style,
+                onlineFallback: true, tagStyle: style, popoverWidth: 480,
               },
             });
           }, tagStyle);

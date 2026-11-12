@@ -95,7 +95,8 @@ pedagogically sound.
   - "Recently met" section: the ≤3 most recent sentences in which the learner met the
     word (each with source page and date), newest first, with every form of the word
     highlighted
-  - card width 380 px (responsive clamp on narrow viewports) so examples read comfortably
+  - popover width configurable — Compact 320 / Default 480 / Wide 640 px (F6), responsive
+    clamp on narrow viewports
 - Lookup chain: **bundled offline core** (top-frequency lemmas with WordNet glosses) →
   **Free Dictionary API** (dictionaryapi.dev) → graceful "no definition found" state.
 - API responses are cached in `chrome.storage.local` (LRU, capped ≈ 2 MB / 2,000 entries).
@@ -149,6 +150,7 @@ Options page + side panel quick settings:
 
 - Level band: 2k / 5k / 10k / 20k (default **5k**)
 - Tagging: on/off; highlight intensity (subtle/normal/vivid); show candidates on/off
+- Popover width: 320 / 480 / 640 px (default **480**)
 - Pass 1 behavior: hide tags entirely vs. faint marks
 - Reader defaults: theme, font, size, width, line height
 - Dictionary: online fallback on/off (offline-only mode)

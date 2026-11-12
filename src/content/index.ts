@@ -113,6 +113,7 @@ async function init(): Promise<void> {
     },
   });
   popoverRef = popover;
+  popover.setWidth(currentSettings.popoverWidth);
 
   // Immersive reader (ADR-0006): on-demand overlay, tagging re-scans the
   // extracted article inside the shadow root.
@@ -237,6 +238,11 @@ function applyTagStyleSetting(settings: IwSettings): void {
   }
 }
 
+/** Popover card width (SIP-004): inline style overrides the stylesheet default. */
+function applyPopoverWidthSetting(settings: IwSettings): void {
+  popoverRef?.setWidth(settings.popoverWidth);
+}
+
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'sync' || !changes['iw:settings'] || !tagger) return;
   const next = { ...DEFAULT_SETTINGS, ...(changes['iw:settings'].newValue as Partial<IwSettings>) };
@@ -245,6 +251,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   tagger.applySettings(next);
   applyP1MarksSetting(next);
   applyTagStyleSetting(next);
+  applyPopoverWidthSetting(next);
   if (levelChanged) {
     tagger.untag();
     if (next.taggingEnabled) void tagger.scan(document.body);

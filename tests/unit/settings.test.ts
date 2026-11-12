@@ -24,9 +24,10 @@ describe('settings', () => {
 
   it('merges stored partial settings over defaults', async () => {
     const storage = fakeSync();
-    await storage.set({ 'iw:settings': { level: '10k' } });
+    await storage.set({ 'iw:settings': { level: '10k', popoverWidth: 640 } });
     const settings = await getSettings(storage);
     expect(settings.level).toBe('10k');
+    expect(settings.popoverWidth).toBe(640);
     expect(settings.taggingEnabled).toBe(DEFAULT_SETTINGS.taggingEnabled);
   });
 

@@ -503,9 +503,77 @@ export const tests = [
         assert.equal(items.sentences.length, 2, 'two exposures recorded');
         assert.ok(items.sentences[0].includes('second exposure'), 'newest exposure first');
         assert.deepEqual(items.marks, ['gossamer', 'gossamer'], 'the word is highlighted in every example');
-        assert.equal(items.width, '380px', 'popover card is wider for example sentences');
+        assert.equal(items.width, '480px', 'popover card is wide enough for example sentences');
         assert.equal(items.status, 'learning', 'classification untouched by the + recorder');
         watcher.assertClean();
+        await page.close();
+      });
+    },
+  },
+  {
+    name: 'popover width follows the setting live; "+" sits after the IPA (SIP-004)',
+    async run() {
+      await withHarness(async ({ browser, baseUrl }) => {
+        const page = await openArticle(browser, baseUrl);
+        // chrome.storage lives in the isolated world — write it from an
+        // extension page (side panel), exactly like a real settings change.
+        const extensionId = (await import('./harness.mjs')).getExtensionId(browser);
+        const panel = await (await import('./harness.mjs')).openExtensionPage(
+          browser,
+          extensionId,
+          'sidepanel/sidepanel.html',
+        );
+        await page.bringToFront();
+
+        const waitForStatusRow = () =>
+          page.waitForFunction(
+            () =>
+              document
+                .getElementById('iw-popover-host')
+                ?.shadowRoot?.querySelector('.card .status-row button') !== null,
+            { timeout: 10_000 },
+          );
+
+        // Default: 480 px; head is word · (IPA ·) "+" · close.
+        await clickWord(page, 'observe');
+        await waitForStatusRow();
+        const initial = await page.evaluate(() => {
+          const card = document.getElementById('iw-popover-host').shadowRoot.querySelector('.card');
+          const classes = [...card.querySelector('.head').children].map((c) => c.className);
+          return { width: getComputedStyle(card).width, classes };
+        });
+        assert.equal(initial.width, '480px', 'default popover width is 480px');
+        assert.equal(initial.classes[0], 'lemma', 'head starts with the word');
+        assert.ok(initial.classes.includes('add'), '+ recorder is in the head');
+        if (initial.classes.includes('phon')) {
+          assert.ok(
+            initial.classes.indexOf('phon') < initial.classes.indexOf('add'),
+            '"+" comes after the IPA',
+          );
+        }
+
+        // Switch to 640 px; storage.onChanged applies it without a reload.
+        await panel.evaluate(() => {
+          chrome.storage.sync.set({
+            'iw:settings': {
+              level: '5k', taggingEnabled: true, pass1ShowMarks: false,
+              onlineFallback: true, tagStyle: 'underline', popoverWidth: 640,
+            },
+          });
+        });
+        await page.evaluate(() => {
+          document.getElementById('iw-popover-host').shadowRoot.querySelector('.card .close').click();
+        });
+        await clickWord(page, 'observe');
+        await waitForStatusRow();
+        const width = await page.evaluate(
+          () =>
+            getComputedStyle(
+              document.getElementById('iw-popover-host').shadowRoot.querySelector('.card'),
+            ).width,
+        );
+        assert.equal(width, '640px', 'width setting applies to the next popover');
+        await panel.close();
         await page.close();
       });
     },

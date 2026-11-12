@@ -235,4 +235,40 @@ describe('popover', () => {
     expect(marks).toEqual(['observed', 'observe']);
     popover.close();
   });
+
+  it('places the + recorder after the IPA in the head (SIP-004)', async () => {
+    document.body.innerHTML =
+      '<p>The <span class="iw-word" data-lemma="observe">observed</span> thing.</p>';
+    const span = document.querySelector('span.iw-word') as HTMLElement;
+    const popover = createPopover({
+      lookup: async () => ({ entry: ENTRY, source: 'core' }), // ENTRY carries a phonetic
+      vocab: createVocabStore(fakeStorage()),
+    });
+    await popover.openFor(span, 'observe');
+    const classes = [...popover._card.querySelector('.head')!.children].map((c) => c.className);
+    expect(classes).toEqual(['lemma', 'phon', 'add', 'close']);
+    popover.close();
+  });
+
+  it('keeps the + recorder right after the word when no IPA exists (SIP-004)', async () => {
+    const entry: DictionaryEntry = { lemma: 'word', senses: [{ definition: 'a unit of language' }] };
+    document.body.innerHTML = '<p>A <span class="iw-word" data-lemma="word">word</span> here.</p>';
+    const span = document.querySelector('span.iw-word') as HTMLElement;
+    const popover = createPopover({
+      lookup: async () => ({ entry, source: 'core' }),
+      vocab: createVocabStore(fakeStorage()),
+    });
+    await popover.openFor(span, 'word');
+    const classes = [...popover._card.querySelector('.head')!.children].map((c) => c.className);
+    expect(classes).toEqual(['lemma', 'add', 'close']);
+    popover.close();
+  });
+
+  it('setWidth overrides the stylesheet width and survives re-renders (SIP-004)', async () => {
+    const { popover } = makePopover();
+    popover.setWidth(640);
+    await popover.openFor(null, 'observe'); // render happens after setWidth
+    expect(popover._card.style.width).toBe('640px');
+    popover.close();
+  });
 });

@@ -14,6 +14,9 @@ export type LevelBand = '2k' | '5k' | '10k' | '20k';
  *  character only, or nothing (tags stay functional in every mode). */
 export type TagStyle = 'underline' | 'firstChar' | 'none';
 
+/** Popover card width in px (SIP-004). Default 480. */
+export type PopoverWidth = 320 | 480 | 640;
+
 /** All runtime messages flow through this discriminated union. */
 export type IwMessage =
   | { type: 'PING' }
@@ -105,6 +108,8 @@ export interface IwSettings {
   onlineFallback: boolean;
   /** Tag decoration placement. Default 'underline'. */
   tagStyle: TagStyle;
+  /** Popover card width in px. Default 480. */
+  popoverWidth: PopoverWidth;
 }
 
 export const DEFAULT_SETTINGS: IwSettings = {
@@ -113,4 +118,5 @@ export const DEFAULT_SETTINGS: IwSettings = {
   pass1ShowMarks: false,
   onlineFallback: true,
   tagStyle: 'underline',
+  popoverWidth: 480,
 };

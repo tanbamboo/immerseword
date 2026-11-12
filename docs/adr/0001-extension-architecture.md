@@ -52,3 +52,13 @@ vanilla TypeScript.
 - **React/Preact**: rejected — bundle size and churn not justified by UI complexity.
 - **All logic in content script**: rejected — dictionary fetch/cache and session state
   belong in one place (SW), shared across tabs and panel.
+
+## Amendments
+
+**2026-11-12 (PR-20, feat-2026-11-12-003).** The popover card's width is a
+synced setting (`popoverWidth: 320 | 480 | 640`, default 480) chosen on the
+options page; the content script applies it live (storage.onChanged) via an
+inline `card.style.width` that overrides the 480 px stylesheet default — the
+responsive `max-width: calc(100vw - 24px)` clamp still guards narrow
+viewports. Popover head order is settled as word · IPA · "+" recorder · close
+(the SIP-003 "+" sits after the IPA when one is shown).
