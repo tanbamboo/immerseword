@@ -51,3 +51,17 @@ Classification runs per **lemma**; all inflected occurrences of a lemma share on
   silent; poor first impression — rejected.
 - **CEFR-graded wordlists** (e.g., EVP): licensing constraints and coarser coverage than
   rank bands — future option per-level if licensed data arrives.
+
+## Amendments
+
+**2026-11-12 (PR-18, feat-2026-11-12-001).** Layer 2 entries gain an optional
+`examples?: VocabExample[]` — the sentence the learner was reading when they
+classified the word as **Learning**, captured by the content-script popover at the
+moment of that click (the only context holding the DOM anchor; side-panel
+classification captures nothing). Each item is `{ text, url, capturedAt }` with
+`url` = page origin + pathname (query/hash stripped). The list is capped at 3,
+newest first, deduped on exact text; `setStatus`/`bumpLookup` preserve it, and it
+round-trips through vocabulary export/import (payload version 2). The popover
+shows it back as a "Recently met" section. Rationale: the sentence a learner
+actually met a word in is the most personal example possible — and it stays in
+`chrome.storage.local` like the rest of the vocabulary (PRD §8).

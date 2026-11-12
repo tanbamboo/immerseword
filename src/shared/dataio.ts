@@ -5,7 +5,7 @@
  */
 
 import type { IwSettings } from './types';
-import type { VocabEntry } from './vocab';
+import { MAX_WORD_EXAMPLES, type VocabEntry, type VocabExample } from './vocab';
 
 export interface ReaderPrefsShape {
   theme: string;
@@ -16,7 +16,7 @@ export interface ReaderPrefsShape {
 
 export interface ExportPayload {
   app: 'immerseword';
-  version: 1;
+  version: 2;
   exportedAt: string; // ISO date
   settings: IwSettings;
   readerPrefs: ReaderPrefsShape;
@@ -30,7 +30,7 @@ export function buildExportPayload(input: {
 }): ExportPayload {
   return {
     app: 'immerseword',
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     settings: { ...input.settings },
     readerPrefs: { ...input.readerPrefs },
@@ -48,6 +48,24 @@ export type ImportResult =
   | { ok: false; error: string };
 
 const STATUSES = new Set(['known', 'learning', 'unknown', 'ignored']);
+
+/** Validates an entry's optional example sentences; malformed items are dropped. */
+function parseExamples(raw: unknown): VocabExample[] {
+  if (!Array.isArray(raw)) return [];
+  const out: VocabExample[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const x = item as Partial<VocabExample>;
+    if (typeof x.text !== 'string' || x.text.trim().length === 0) continue;
+    out.push({
+      text: x.text,
+      url: typeof x.url === 'string' ? x.url : '',
+      capturedAt: typeof x.capturedAt === 'number' ? x.capturedAt : Date.now(),
+    });
+    if (out.length >= MAX_WORD_EXAMPLES) break;
+  }
+  return out;
+}
 
 /** Validates and extracts an import payload; unknown shapes are rejected. */
 export function parseImportPayload(raw: string): ImportResult {
@@ -71,13 +89,16 @@ export function parseImportPayload(raw: string): ImportResult {
     if (!/^[a-z][a-z'’-]*$/i.test(lemma)) continue;
     const e = entry as Partial<VocabEntry> | null;
     if (!e || typeof e !== 'object' || !e.status || !STATUSES.has(e.status)) continue;
-    vocabulary[lemma.toLowerCase()] = {
+    const out: VocabEntry = {
       status: e.status as VocabEntry['status'],
       firstSeen: typeof e.firstSeen === 'number' ? e.firstSeen : Date.now(),
       lastSeen: typeof e.lastSeen === 'number' ? e.lastSeen : Date.now(),
       timesSeen: typeof e.timesSeen === 'number' ? e.timesSeen : 1,
       lookupCount: typeof e.lookupCount === 'number' ? e.lookupCount : 0,
     };
+    const examples = parseExamples(e.examples);
+    if (examples.length > 0) out.examples = examples;
+    vocabulary[lemma.toLowerCase()] = out;
     imported += 1;
   }
 

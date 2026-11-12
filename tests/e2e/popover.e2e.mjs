@@ -271,4 +271,153 @@ export const tests = [
       });
     },
   },
+  {
+    name: 'marking a word Learning captures the sentence and remembers it across reloads (SIP-002)',
+    async run() {
+      await withHarness(async ({ browser, baseUrl }) => {
+        const page = await openArticle(browser, baseUrl);
+        const watcher = watchPage(page, 'fixture');
+
+        // A paragraph no other test touches; the MutationObserver rescan tags it.
+        // (The fixture article already mentions gossamer, so target OUR span.)
+        const sentence = 'The gossamer threads glittered in the morning sun.';
+        await page.evaluate((s) => {
+          const p = document.createElement('p');
+          p.id = 'iw-sip002-single';
+          p.textContent = s;
+          document.body.append(p);
+        }, sentence);
+        const clickInjected = () =>
+          page.evaluate(() => {
+            const span = document.querySelector('#iw-sip002-single span.iw-word');
+            if (!span) return false;
+            span.click();
+            return true;
+          });
+        await page.waitForFunction(
+          () => document.querySelector('#iw-sip002-single span.iw-word') !== null,
+          { timeout: 10_000 },
+        );
+
+        assert.ok(await clickInjected(), 'injected gossamer span should be clickable');
+        await page.waitForFunction(
+          () =>
+            document
+              .getElementById('iw-popover-host')
+              ?.shadowRoot?.querySelector('.card .status-row button') !== null,
+          { timeout: 10_000 },
+        );
+        await page.evaluate(() => {
+          const card = document.getElementById('iw-popover-host').shadowRoot.querySelector('.card');
+          card.querySelector('button[data-status="learning"]').click();
+        });
+        // The capture lands storage-first, then re-renders the open card.
+        await page.waitForFunction(
+          () =>
+            document.getElementById('iw-popover-host')?.shadowRoot?.querySelector('.card .met .ex') !==
+            null,
+          { timeout: 5_000 },
+        );
+        let text = await cardText(page);
+        assert.ok(text.includes('Recently met'), 'Recently met section renders');
+        assert.ok(text.includes(sentence), 'the met sentence renders');
+        assert.ok(text.includes('127.0.0.1'), 'source host renders');
+
+        // The example survives a reload (chrome.storage.local), proving the
+        // personal language lifecycle across pages.
+        await page.reload({ waitUntil: 'load' });
+        await page.waitForFunction(
+          () => document.querySelectorAll('span.iw-word').length >= 6,
+          { timeout: 10_000 },
+        );
+        await page.evaluate((s) => {
+          const p = document.createElement('p');
+          p.id = 'iw-sip002-single';
+          p.textContent = s;
+          document.body.append(p);
+        }, sentence);
+        await page.waitForFunction(
+          () => document.querySelector('#iw-sip002-single span.iw-word') !== null,
+          { timeout: 10_000 },
+        );
+        assert.ok(await clickInjected(), 'injected gossamer span should be clickable after reload');
+        await page.waitForFunction(
+          () =>
+            document
+              .getElementById('iw-popover-host')
+              ?.shadowRoot?.querySelector('.card .met .ex') !== null,
+          { timeout: 10_000 },
+        );
+        text = await cardText(page);
+        assert.ok(text.includes('Recently met'), 'example persists across reload');
+        watcher.assertClean();
+        await page.close();
+      });
+    },
+  },
+  {
+    name: 'a second Learning encounter adds another example, newest first (SIP-002)',
+    async run() {
+      await withHarness(async ({ browser, baseUrl }) => {
+        const page = await openArticle(browser, baseUrl);
+
+        const sentences = [
+          'A first encounter with gossamer happened here.',
+          'The second encounter mentioned gossamer again, later.',
+        ];
+        await page.evaluate((ss) => {
+          ss.forEach((s, i) => {
+            const p = document.createElement('p');
+            p.id = `iw-sip002-multi-${i}`;
+            p.textContent = s;
+            document.body.append(p);
+          });
+        }, sentences);
+        await page.waitForFunction(
+          () => document.querySelectorAll('span.iw-word[data-lemma="gossamer"]').length >= 2,
+          { timeout: 10_000 },
+        );
+
+        for (let i = 0; i < sentences.length; i++) {
+          // Click the occurrence inside the i-th injected paragraph.
+          await page.evaluate((needle) => {
+            const span = [...document.querySelectorAll('span.iw-word[data-lemma="gossamer"]')].find(
+              (s) => s.closest('p')?.textContent.includes(needle),
+            );
+            span?.click();
+          }, sentences[i]);
+          await page.waitForFunction(
+            () =>
+              document
+                .getElementById('iw-popover-host')
+                ?.shadowRoot?.querySelector('.card .status-row button') !== null,
+            { timeout: 10_000 },
+          );
+          await page.evaluate(() => {
+            const card = document.getElementById('iw-popover-host').shadowRoot.querySelector('.card');
+            card.querySelector('button[data-status="learning"]').click();
+          });
+          // Wait for this click's async capture to settle before the next one.
+          await page.waitForFunction(
+            (expected) =>
+              document
+                .getElementById('iw-popover-host')
+                ?.shadowRoot?.querySelectorAll('.card .met .ex').length === expected,
+            { timeout: 5_000 },
+            i + 1,
+          );
+        }
+
+        const items = await page.evaluate(() =>
+          [...document.getElementById('iw-popover-host').shadowRoot.querySelectorAll('.card .met .ex')].map(
+            (e) => e.textContent,
+          ),
+        );
+        assert.equal(items.length, 2, 'two examples captured');
+        assert.ok(items[0].includes('second encounter'), 'newest example first');
+        assert.ok(items[1].includes('first encounter'), 'older example second');
+        await page.close();
+      });
+    },
+  },
 ];
