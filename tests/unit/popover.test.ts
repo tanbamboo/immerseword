@@ -176,4 +176,63 @@ describe('popover', () => {
     expect(entry?.examples).toBeUndefined();
     popover.close();
   });
+
+  it('shows a + recorder from a page anchor and records the exposure on demand (SIP-003)', async () => {
+    document.body.innerHTML =
+      '<p>Before. The <span class="iw-word" data-lemma="gossamer">gossamer</span> veil shone. After.</p>';
+    const span = document.querySelector('span.iw-word') as HTMLElement;
+    const vocab = createVocabStore(fakeStorage());
+    const popover = createPopover({
+      lookup: async () => ({ entry: ENTRY, source: 'core' }),
+      vocab,
+      onStatusChange: vi.fn(),
+    });
+    // Word is already learning — no Learning re-click available (the gap this fixes).
+    await vocab.setStatus('gossamer', 'learning');
+
+    await popover.openFor(span, 'gossamer');
+    const add = popover._card.querySelector<HTMLButtonElement>('button.add')!;
+    expect(add).not.toBeNull();
+    add.click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    const entry = await vocab.getEntry('gossamer');
+    expect(entry?.status).toBe('learning'); // classification untouched
+    expect(entry?.examples?.[0]?.text).toBe('The gossamer veil shone.');
+    expect(popover._card.textContent).toContain('Recently met');
+    expect(add.textContent).toBe('✓'); // flashes confirmation
+    popover.close();
+  });
+
+  it('keeps the + recorder hidden without a page anchor (SIP-003)', async () => {
+    const { popover } = makePopover();
+    await popover.openFor(null, 'observe');
+    expect(popover._card.querySelector('button.add')).toBeNull();
+    popover.close();
+  });
+
+  it('highlights the word inside example sentences (SIP-003)', async () => {
+    const { popover, vocab } = makePopover();
+    await vocab.setStatus('observe', 'learning');
+    await vocab.addExample('observe', { text: 'We observe the eclipse.', url: 'https://a/post' });
+    await popover.openFor(null, 'observe');
+    const marks = [...popover._card.querySelectorAll('.met .ex mark')].map((m) => m.textContent);
+    expect(marks).toEqual(['observe']);
+    popover.close();
+  });
+
+  it('highlights inflected forms through isWordForm (SIP-003)', async () => {
+    const vocab = createVocabStore(fakeStorage());
+    await vocab.setStatus('observe', 'learning');
+    await vocab.addExample('observe', { text: 'She observed it, and we observe again.', url: 'https://a/' });
+    const popover = createPopover({
+      lookup: async () => ({ entry: ENTRY, source: 'core' }),
+      vocab,
+      isWordForm: (lemma, token) => token.toLowerCase().startsWith(lemma.slice(0, 6)),
+    });
+    await popover.openFor(null, 'observe');
+    const marks = [...popover._card.querySelectorAll('.met .ex mark')].map((m) => m.textContent);
+    expect(marks).toEqual(['observed', 'observe']);
+    popover.close();
+  });
 });

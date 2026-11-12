@@ -88,10 +88,14 @@ pedagogically sound.
 
 - Click (or double-click any word, or select + right-click → "Look up with ImmerseWord") opens a popover:
   - headword, phonetic IPA (when available), part of speech
+  - **"+" button** beside the headword records the current sentence as a personal
+    example on demand (also recorded automatically at the Learning click)
   - numbered monolingual senses (up to 3), each with one example sentence when available
   - status buttons: **Known / Learning / Unknown / Ignore**
-  - "Recently met" section: the ≤3 most recent sentences in which the learner
-    classified the word as Learning (each with source page and date), newest first
+  - "Recently met" section: the ≤3 most recent sentences in which the learner met the
+    word (each with source page and date), newest first, with every form of the word
+    highlighted
+  - card width 380 px (responsive clamp on narrow viewports) so examples read comfortably
 - Lookup chain: **bundled offline core** (top-frequency lemmas with WordNet glosses) →
   **Free Dictionary API** (dictionaryapi.dev) → graceful "no definition found" state.
 - API responses are cached in `chrome.storage.local` (LRU, capped ≈ 2 MB / 2,000 entries).

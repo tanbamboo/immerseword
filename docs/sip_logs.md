@@ -135,3 +135,58 @@ PR merges. Append-only — never rewrite a merged proposal.
   "gossamer", so the new spec clicks the span inside its own injected
   paragraph instead of the first page-wide match (the capture itself
   worked on the first run).
+
+## SIP-003 — "+" records exposures on demand; wider popover; highlighted word in examples
+
+- **Requested:** 2026-11-12 (`feat-2026-11-12-002`)
+- **Motivation:** SIP-002 records a sentence only at the Learning click
+  — and a word is marked Learning exactly once, so later encounters
+  have no way to grow the list: "user can only click Learning button
+  once". Sentences also render cramped at 320 px, and the met word
+  doesn't stand out inside its own example.
+- **Scope:**
+  1. A **"+" button** after the word in the popover head records the
+     current encounter (sentence + source) into the word's examples on
+     demand — visible whenever the popover has a page anchor, in both
+     the definition and no-definition states. It reuses SIP-002's
+     capture path (dedupe, cap 3, newest first) and briefly shows "✓".
+     The Learning click keeps recording the first exposure (unchanged).
+  2. Popover card width **320 px → 380 px** (responsive `max-width`
+     unchanged) so example sentences read comfortably.
+  3. In "Recently met" sentences, every form of the word (inflections
+     resolved by the shared lemmatizer) is **highlighted**.
+- **UX sketch:**
+  - `serendipity [+] /sɜːrəpənˈɪti/                ✕`
+  - click `+` → sentence captured → "Recently met" section updates in
+    place, `+` flashes `✓` (a duplicate just refreshes its recency)
+- **Technical approach:**
+  - `PopoverDeps` gains optional `isWordForm(lemma, token)`; the
+    content script wires it to the existing `createLemmatizer` instance
+    (hoisted out of the frequency-index callback), so `observed`/
+    `observing` highlight for lemma `observe`. Without the dep the
+    highlight falls back to exact case-insensitive matches.
+  - `metSection` builds each sentence by tokenizing
+    `/[A-Za-z][A-Za-z'’-]*/g` and wrapping hits in
+    `<mark class="met-hit">` — text-node assembly, no innerHTML.
+  - The `+` button shares `captureExample()` with the Learning path;
+    no storage or schema change (SIP-002's `addExample` already
+    creates a missing entry, so `+` on an unclassified word starts
+    tracking it — "record the word and context exposure").
+- **Test plan:** unit — `+` renders with an anchor, records on click
+  (flash ✓), stays absent without an anchor; marks wrap matched forms
+  via `isWordForm` and exact fallback. e2e — an already-learning word:
+  `+` (not Learning again) records the new sentence with the word
+  marked; card computes 380 px wide; existing gates green.
+- **Risks:** lemmatizer false positives could highlight a look-alike
+  token (e.g. "saw" for lemma "see") — acceptable, matching is exactly
+  what tagging already relies on; wider card on small screens still
+  clamps to `100vw - 24px`.
+- **Docs:** PRD F2 (+ button, width, highlight); ADR-0003 amendment
+  extended (exposure capture is on-demand via `+`, display-side lemma
+  matching only).
+- **Outcome:** implemented in PR-19 (`pr/19-example-plus-button`).
+  Gates: typecheck, unit 128/128, e2e 34/34. Design note: the
+  no-definition state gained the same head row (word + `+` + close)
+  so the recorder lives in one predictable place; highlighting is
+  display-side only, so examples recorded before this change highlight
+  too.

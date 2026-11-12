@@ -13,6 +13,8 @@ export interface PopoverDeps {
   lookup: (lemma: string) => Promise<{ entry: DictionaryEntry | null; source: string }>;
   vocab: VocabStore;
   onStatusChange?: (lemma: string, status: WordStatus) => void;
+  /** Resolves whether a sentence token is a form of the lemma (SIP-003 highlight). */
+  isWordForm?: (lemma: string, token: string) => boolean;
 }
 
 const STYLE = `
@@ -20,7 +22,7 @@ const STYLE = `
   * { box-sizing: border-box; }
   .card {
     position: fixed; z-index: 2147483647;
-    width: 320px; max-width: calc(100vw - 24px);
+    width: 380px; max-width: calc(100vw - 24px);
     background: #fffdf8; color: #1f2933;
     border: 1px solid #d9d4c8; border-radius: 12px;
     box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
@@ -30,6 +32,15 @@ const STYLE = `
   .head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
   .lemma { font-size: 17px; font-weight: 700; }
   .phon { color: #616e7c; font-size: 12px; }
+  .add {
+    margin-left: 4px; flex: none; align-self: center;
+    width: 20px; height: 20px; padding: 0; line-height: 1; font-size: 14px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid #d9d4c8; background: #fff; color: #4f46e5;
+    border-radius: 50%; cursor: pointer;
+  }
+  .add:hover { background: #eef2ff; border-color: #4f46e5; }
+  .add.done { color: #059669; border-color: #059669; background: #ecfdf5; }
   .close {
     margin-left: auto; border: 0; background: transparent; cursor: pointer;
     font-size: 15px; color: #616e7c; padding: 2px 6px; border-radius: 6px;
@@ -62,6 +73,7 @@ const STYLE = `
     color: #9aa5b1;
   }
   .met .ex { margin: 5px 0 0; }
+  .met .ex mark { background: #fde68a; color: inherit; font-style: italic; border-radius: 2px; padding: 0 1px; }
   .met-src { font-size: 10.5px; color: #9aa5b1; margin: 1px 0 0; }
 `;
 
@@ -118,8 +130,60 @@ export function createPopover(deps: PopoverDeps) {
     card.style.top = `${Math.max(8, y)}px`;
   }
 
-  /** SIP-002: "Recently met" — the ≤3 sentences where the word was marked Learning. */
-  function metSection(examples: VocabExample[]): HTMLElement {
+  /** Head row: lemma, the SIP-003 "+" recorder, phonetic, close. */
+  function headRow(displayLemma: string, phonetic?: string): HTMLElement {
+    const head = document.createElement('div');
+    head.className = 'head';
+    const lemmaEl = document.createElement('span');
+    lemmaEl.className = 'lemma';
+    lemmaEl.textContent = displayLemma;
+    head.append(lemmaEl);
+    if (currentAnchor) head.append(addButton());
+    if (phonetic) {
+      const phon = document.createElement('span');
+      phon.className = 'phon';
+      phon.textContent = phonetic;
+      head.append(phon);
+    }
+    const close = document.createElement('button');
+    close.className = 'close';
+    close.setAttribute('aria-label', 'Close');
+    close.textContent = '✕';
+    close.addEventListener('click', () => closePopover());
+    head.append(close);
+    return head;
+  }
+
+  /** SIP-003: records the current encounter as a personal example. */
+  function addButton(): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.className = 'add';
+    btn.type = 'button';
+    btn.textContent = '+';
+    btn.title = 'Record this sentence as an example';
+    btn.setAttribute('aria-label', 'Record this sentence as an example');
+    btn.addEventListener('click', () => void onAddExample(btn));
+    return btn;
+  }
+
+  async function onAddExample(btn: HTMLButtonElement): Promise<void> {
+    const lemma = currentLemma;
+    if (!lemma) return;
+    if (await captureExample(lemma)) flashDone(btn);
+  }
+
+  function flashDone(btn: HTMLButtonElement): void {
+    btn.textContent = '✓';
+    btn.classList.add('done');
+    setTimeout(() => {
+      if (!btn.isConnected) return; // popover re-rendered meanwhile
+      btn.textContent = '+';
+      btn.classList.remove('done');
+    }, 1000);
+  }
+
+  /** SIP-002: "Recently met" — the ≤3 most recent personal example sentences. */
+  function metSection(lemma: string, examples: VocabExample[]): HTMLElement {
     const section = document.createElement('div');
     section.className = 'met';
     const header = document.createElement('div');
@@ -129,7 +193,9 @@ export function createPopover(deps: PopoverDeps) {
     for (const example of examples) {
       const ex = document.createElement('p');
       ex.className = 'ex';
-      ex.textContent = `“${example.text}”`;
+      ex.append('“');
+      appendHighlighted(ex, example.text, lemma);
+      ex.append('”');
       section.append(ex);
       const src = document.createElement('div');
       src.className = 'met-src';
@@ -137,6 +203,25 @@ export function createPopover(deps: PopoverDeps) {
       section.append(src);
     }
     return section;
+  }
+
+  /** Appends text with every form of the lemma wrapped in a <mark> (SIP-003). */
+  function appendHighlighted(target: HTMLElement, text: string, lemma: string): void {
+    const isHit = deps.isWordForm
+      ? (token: string) => deps.isWordForm?.(lemma, token) === true
+      : (token: string) => token.toLowerCase() === lemma;
+    let last = 0;
+    for (const m of text.matchAll(/[A-Za-z][A-Za-z'’-]*/g)) {
+      const token = m[0];
+      if (!isHit(token)) continue;
+      const at = m.index ?? 0;
+      if (at > last) target.append(text.slice(last, at));
+      const mark = document.createElement('mark');
+      mark.textContent = token;
+      target.append(mark);
+      last = at + token.length;
+    }
+    if (last < text.length) target.append(text.slice(last));
   }
 
   function sourceLabel(example: VocabExample): string {
@@ -153,25 +238,7 @@ export function createPopover(deps: PopoverDeps) {
     const activeStatus = vocabEntry?.status;
     card.innerHTML = '';
 
-    const head = document.createElement('div');
-    head.className = 'head';
-    const lemmaEl = document.createElement('span');
-    lemmaEl.className = 'lemma';
-    lemmaEl.textContent = entry.lemma ?? lemma;
-    head.append(lemmaEl);
-    if (entry.phonetic) {
-      const phon = document.createElement('span');
-      phon.className = 'phon';
-      phon.textContent = entry.phonetic;
-      head.append(phon);
-    }
-    const close = document.createElement('button');
-    close.className = 'close';
-    close.setAttribute('aria-label', 'Close');
-    close.textContent = '✕';
-    close.addEventListener('click', () => closePopover());
-    head.append(close);
-    card.append(head);
+    card.append(headRow(entry.lemma ?? lemma, entry.phonetic));
 
     for (const sense of entry.senses.slice(0, 3)) {
       const wrap = document.createElement('div');
@@ -196,7 +263,7 @@ export function createPopover(deps: PopoverDeps) {
     }
 
     if (vocabEntry?.examples?.length) {
-      card.append(metSection(vocabEntry.examples));
+      card.append(metSection(lemma, vocabEntry.examples));
     }
 
     const row = document.createElement('div');
@@ -224,12 +291,13 @@ export function createPopover(deps: PopoverDeps) {
 
   function renderNoDefinition(lemma: string, vocabEntry?: VocabEntry): void {
     card.innerHTML = '';
+    card.append(headRow(lemma));
     const state = document.createElement('p');
     state.className = 'state';
     state.textContent = `No monolingual definition found for “${lemma}”.`;
     card.append(state);
     if (vocabEntry?.examples?.length) {
-      card.append(metSection(vocabEntry.examples));
+      card.append(metSection(lemma, vocabEntry.examples));
     }
     const row = statusRow();
     card.append(row);
@@ -263,22 +331,24 @@ export function createPopover(deps: PopoverDeps) {
   }
 
   /** SIP-002: the Learning click remembers the sentence it happened in. */
-  async function captureExample(lemma: string): Promise<void> {
+  async function captureExample(lemma: string): Promise<boolean> {
     const sentence = extractSentence(currentAnchor);
-    if (!sentence) return;
+    if (!sentence) return false;
     try {
       const entry = await deps.vocab.addExample(lemma, sentence);
-      refreshMet(entry.examples);
+      refreshMet(lemma, entry.examples);
+      return true;
     } catch {
       // Capture is best-effort; the classification itself already persisted.
+      return false;
     }
   }
 
   /** Re-render the met section in the open card (used after a live capture). */
-  function refreshMet(examples: VocabExample[] | undefined): void {
+  function refreshMet(lemma: string, examples: VocabExample[] | undefined): void {
     card.querySelector('.met')?.remove();
     if (!examples?.length) return;
-    card.querySelector('.status-row')?.before(metSection(examples));
+    card.querySelector('.status-row')?.before(metSection(lemma, examples));
   }
 
   async function openFor(anchor: HTMLElement | Range | null, lemma: string): Promise<void> {

@@ -420,4 +420,94 @@ export const tests = [
       });
     },
   },
+  {
+    name: '+ button records exposures on demand, highlights the word, wider card (SIP-003)',
+    async run() {
+      await withHarness(async ({ browser, baseUrl }) => {
+        const page = await openArticle(browser, baseUrl);
+        const watcher = watchPage(page, 'fixture');
+
+        const sentences = [
+          'A gossamer first exposure gets marked Learning.',
+          'The gossamer second exposure is recorded with the plus button.',
+        ];
+        await page.evaluate((ss) => {
+          ss.forEach((s, i) => {
+            const p = document.createElement('p');
+            p.id = `iw-sip003-${i}`;
+            p.textContent = s;
+            document.body.append(p);
+          });
+        }, sentences);
+        const clickInParagraph = (needle) =>
+          page.evaluate((n) => {
+            const span = [...document.querySelectorAll('p[id^="iw-sip003-"] span.iw-word')].find((s) =>
+              s.closest('p')?.textContent.includes(n),
+            );
+            span?.click();
+          }, needle);
+        const waitForStatusRow = () =>
+          page.waitForFunction(
+            () =>
+              document
+                .getElementById('iw-popover-host')
+                ?.shadowRoot?.querySelector('.card .status-row button') !== null,
+            { timeout: 10_000 },
+          );
+
+        // Exposure 1: classify Learning once (this also records sentence 1).
+        await page.waitForFunction(
+          () => document.querySelectorAll('p[id^="iw-sip003-"] span.iw-word').length >= 2,
+          { timeout: 10_000 },
+        );
+        await clickInParagraph('first exposure');
+        await waitForStatusRow();
+        await page.evaluate(() => {
+          const card = document.getElementById('iw-popover-host').shadowRoot.querySelector('.card');
+          card.querySelector('button[data-status="learning"]').click();
+        });
+        await page.waitForFunction(
+          () => document.getElementById('iw-popover-host')?.shadowRoot?.querySelector('.card .met .ex') !== null,
+          { timeout: 5_000 },
+        );
+
+        // Exposure 2: same learning word — only the + button records it now.
+        await clickInParagraph('second exposure');
+        await waitForStatusRow();
+        assert.ok(
+          await page.evaluate(
+            () => document.getElementById('iw-popover-host').shadowRoot.querySelector('.card .add') !== null,
+          ),
+          '+ recorder renders after the word',
+        );
+        await page.evaluate(() => {
+          document.getElementById('iw-popover-host').shadowRoot.querySelector('.card .add').click();
+        });
+        await page.waitForFunction(
+          () =>
+            document
+              .getElementById('iw-popover-host')
+              ?.shadowRoot?.querySelectorAll('.card .met .ex').length === 2,
+          { timeout: 5_000 },
+        );
+
+        const items = await page.evaluate(() => {
+          const card = document.getElementById('iw-popover-host').shadowRoot.querySelector('.card');
+          return {
+            sentences: [...card.querySelectorAll('.met .ex')].map((e) => e.textContent),
+            marks: [...card.querySelectorAll('.met .ex mark')].map((m) => m.textContent),
+            width: getComputedStyle(card).width,
+            status: document.querySelector('p[id^="iw-sip003-"] span.iw-word')?.dataset.iwStatus,
+          };
+        });
+        assert.equal(items.sentences.length, 2, 'two exposures recorded');
+        assert.ok(items.sentences[0].includes('second exposure'), 'newest exposure first');
+        assert.deepEqual(items.marks, ['gossamer', 'gossamer'], 'the word is highlighted in every example');
+        assert.equal(items.width, '380px', 'popover card is wider for example sentences');
+        assert.equal(items.status, 'learning', 'classification untouched by the + recorder');
+        watcher.assertClean();
+        await page.close();
+      });
+    },
+  },
 ];
