@@ -95,13 +95,15 @@ async function init(): Promise<void> {
   }
 
   const known = new Set(words);
-  const index = createFrequencyIndex(words, (s) => createLemmatizer({ knownLemmas: known }).lemma(s));
+  const lemmatizer = createLemmatizer({ knownLemmas: known });
+  const index = createFrequencyIndex(words, (s) => lemmatizer.lemma(s));
   tagger = createTagger({ frequency: index, settings: currentSettings });
   tagger.setVocab({ statusOf: (lemma) => statusMap.get(lemma) });
 
   const popover = createPopover({
     lookup: lookupDefinition,
     vocab,
+    isWordForm: (lemma, token) => lemmatizer.lemma(token.toLowerCase()) === lemma,
     onStatusChange: (lemma, status) => {
       statusMap.set(lemma, status);
       tagger?.refreshStatus(lemma, status);

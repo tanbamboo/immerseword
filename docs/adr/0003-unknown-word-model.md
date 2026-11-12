@@ -65,3 +65,10 @@ round-trips through vocabulary export/import (payload version 2). The popover
 shows it back as a "Recently met" section. Rationale: the sentence a learner
 actually met a word in is the most personal example possible — and it stays in
 `chrome.storage.local` like the rest of the vocabulary (PRD §8).
+
+**2026-11-12 (PR-19, feat-2026-11-12-002).** Extends the amendment above:
+exposure capture is also **on demand** — a "+" button in the popover head
+records the current sentence through the same `addExample` path (a word is
+marked Learning only once, so later encounters need their own affordance).
+Example rendering highlights every form of the word by resolving sentence
+tokens through the shared lemmatizer at display time; no schema change.

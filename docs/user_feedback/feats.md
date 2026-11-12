@@ -34,3 +34,17 @@ Analysis and implementation live in [../sip_logs.md](../sip_logs.md).
 > show the sentences one by one(maybe limit to 3 recently) which I met
 > before.
 
+## feat-2026-11-12-002 — "+" button to record exposures; wider popover; highlighted word in examples
+
+**Recorded:** 2026-11-12 15:42 +0800
+**Source:** user request (ZCode session)
+**Status:** implemented — PR-19 (`pr/19-example-plus-button`); see SIP-003
+
+**Raw request:**
+
+> as user can only click "Learning" button once, please add another "+"
+> button after the word in the popover window to record the word and
+> context exposure. and the width of the popover window should be
+> increased to display example sentences. and in the example sentences,
+> the word should be highlighted.
+
