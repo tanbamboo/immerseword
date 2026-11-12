@@ -6,7 +6,8 @@
  */
 
 import type { DictionaryEntry, WordStatus } from '../shared/types';
-import type { VocabStore } from '../shared/vocab';
+import type { VocabEntry, VocabExample, VocabStore } from '../shared/vocab';
+import { extractSentence } from './sentence';
 
 export interface PopoverDeps {
   lookup: (lemma: string) => Promise<{ entry: DictionaryEntry | null; source: string }>;
@@ -55,6 +56,13 @@ const STYLE = `
   .state { color: #616e7c; padding: 8px 0; text-align: center; }
   .state.err { color: #b91c1c; }
   .src { font-size: 10.5px; color: #9aa5b1; margin-top: 8px; text-align: right; }
+  .met { margin-top: 10px; border-top: 1px dashed #ece8df; padding-top: 8px; }
+  .met-h {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: #9aa5b1;
+  }
+  .met .ex { margin: 5px 0 0; }
+  .met-src { font-size: 10.5px; color: #9aa5b1; margin: 1px 0 0; }
 `;
 
 const STATUS_LABELS: Array<[WordStatus, string]> = [
@@ -110,7 +118,39 @@ export function createPopover(deps: PopoverDeps) {
     card.style.top = `${Math.max(8, y)}px`;
   }
 
-  function renderEntry(lemma: string, entry: DictionaryEntry, source: string, activeStatus?: WordStatus): void {
+  /** SIP-002: "Recently met" — the ≤3 sentences where the word was marked Learning. */
+  function metSection(examples: VocabExample[]): HTMLElement {
+    const section = document.createElement('div');
+    section.className = 'met';
+    const header = document.createElement('div');
+    header.className = 'met-h';
+    header.textContent = 'Recently met';
+    section.append(header);
+    for (const example of examples) {
+      const ex = document.createElement('p');
+      ex.className = 'ex';
+      ex.textContent = `“${example.text}”`;
+      section.append(ex);
+      const src = document.createElement('div');
+      src.className = 'met-src';
+      src.textContent = sourceLabel(example);
+      section.append(src);
+    }
+    return section;
+  }
+
+  function sourceLabel(example: VocabExample): string {
+    let host = example.url;
+    try {
+      host = new URL(example.url).host;
+    } catch {
+      // Not a parseable URL — show it raw.
+    }
+    return `${host} · ${new Date(example.capturedAt).toISOString().slice(0, 10)}`;
+  }
+
+  function renderEntry(lemma: string, entry: DictionaryEntry, source: string, vocabEntry?: VocabEntry): void {
+    const activeStatus = vocabEntry?.status;
     card.innerHTML = '';
 
     const head = document.createElement('div');
@@ -155,6 +195,10 @@ export function createPopover(deps: PopoverDeps) {
       card.append(wrap);
     }
 
+    if (vocabEntry?.examples?.length) {
+      card.append(metSection(vocabEntry.examples));
+    }
+
     const row = document.createElement('div');
     row.className = 'status-row';
     for (const [status, label] of STATUS_LABELS) {
@@ -178,12 +222,15 @@ export function createPopover(deps: PopoverDeps) {
     position(currentAnchor);
   }
 
-  function renderNoDefinition(lemma: string): void {
+  function renderNoDefinition(lemma: string, vocabEntry?: VocabEntry): void {
     card.innerHTML = '';
     const state = document.createElement('p');
     state.className = 'state';
     state.textContent = `No monolingual definition found for “${lemma}”.`;
     card.append(state);
+    if (vocabEntry?.examples?.length) {
+      card.append(metSection(vocabEntry.examples));
+    }
     const row = statusRow();
     card.append(row);
     card.style.display = 'block';
@@ -208,10 +255,30 @@ export function createPopover(deps: PopoverDeps) {
     if (!lemma) return;
     await deps.vocab.setStatus(lemma, status);
     deps.onStatusChange?.(lemma, status);
+    if (status === 'learning') await captureExample(lemma);
     // Reflect the new active button without re-looking-up.
     card.querySelectorAll<HTMLButtonElement>('.status-row button').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.status === status);
     });
+  }
+
+  /** SIP-002: the Learning click remembers the sentence it happened in. */
+  async function captureExample(lemma: string): Promise<void> {
+    const sentence = extractSentence(currentAnchor);
+    if (!sentence) return;
+    try {
+      const entry = await deps.vocab.addExample(lemma, sentence);
+      refreshMet(entry.examples);
+    } catch {
+      // Capture is best-effort; the classification itself already persisted.
+    }
+  }
+
+  /** Re-render the met section in the open card (used after a live capture). */
+  function refreshMet(examples: VocabExample[] | undefined): void {
+    card.querySelector('.met')?.remove();
+    if (!examples?.length) return;
+    card.querySelector('.status-row')?.before(metSection(examples));
   }
 
   async function openFor(anchor: HTMLElement | Range | null, lemma: string): Promise<void> {
@@ -228,9 +295,9 @@ export function createPopover(deps: PopoverDeps) {
     if (seq !== lookupSeq || currentLemma !== lemma) return; // superseded or closed
 
     if (result.entry) {
-      renderEntry(lemma, result.entry, result.source, entry?.status);
+      renderEntry(lemma, result.entry, result.source, entry);
     } else {
-      renderNoDefinition(lemma);
+      renderNoDefinition(lemma, entry);
     }
     void deps.vocab.bumpLookup(lemma).catch(() => undefined);
   }

@@ -90,6 +90,8 @@ pedagogically sound.
   - headword, phonetic IPA (when available), part of speech
   - numbered monolingual senses (up to 3), each with one example sentence when available
   - status buttons: **Known / Learning / Unknown / Ignore**
+  - "Recently met" section: the ≤3 most recent sentences in which the learner
+    classified the word as Learning (each with source page and date), newest first
 - Lookup chain: **bundled offline core** (top-frequency lemmas with WordNet glosses) →
   **Free Dictionary API** (dictionaryapi.dev) → graceful "no definition found" state.
 - API responses are cached in `chrome.storage.local` (LRU, capped ≈ 2 MB / 2,000 entries).
@@ -127,7 +129,10 @@ shows progress and triggers transitions; the side panel mirrors the same control
 
 ### F5 — Vocabulary manager (U3, U6)
 
-- Data model: `lemma → { status, firstSeen, lastSeen, timesSeen, lookupCount, definition? }`.
+- Data model: `lemma → { status, firstSeen, lastSeen, timesSeen, lookupCount, definition?, examples? }`.
+  `examples` holds up to 3 sentences captured at the moment the word was marked
+  **Learning** from the popover (newest first, deduped; each with source page and date),
+  shown back in the popover's "Recently met" section (F2).
 - Surfaces:
   - popover status buttons (per word, instantly re-renders all occurrences on the page)
   - side panel "This page" list (grouped by status) and global "Vocabulary" browser
@@ -184,8 +189,9 @@ pages; frequency + personal list make every next page smarter.
 
 ## 8. Privacy
 
-- All learning data (vocabulary, sessions, cache) stays in `chrome.storage.local`/`session`
-  on the device. Settings sync via the user's own Chrome sync.
+- All learning data (vocabulary — including captured example sentences — sessions, cache)
+  stays in `chrome.storage.local`/`session` on the device. Settings sync via the user's own
+  Chrome sync. Example sentences store only the page's origin + path, never query strings.
 - The only network request the extension ever makes is to `api.dictionaryapi.dev` for words
   missing from the bundled dictionary (can be disabled in settings).
 - No analytics, no accounts, no page-content transmission anywhere else.

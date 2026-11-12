@@ -118,4 +118,62 @@ describe('popover', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(popover.isOpen()).toBe(false);
   });
+
+  it('renders saved examples in a Recently met section (SIP-002)', async () => {
+    const { popover, vocab } = makePopover();
+    await vocab.setStatus('observe', 'learning');
+    await vocab.addExample('observe', {
+      text: 'We observed the eclipse together.',
+      url: 'https://example.com/post',
+    });
+    await popover.openFor(null, 'observe');
+    const text = popover._card.textContent ?? '';
+    expect(text).toContain('Recently met');
+    expect(text).toContain('We observed the eclipse together.');
+    expect(text).toContain('example.com');
+    popover.close();
+  });
+
+  it('clicking Learning captures the sentence around the clicked word (SIP-002)', async () => {
+    document.body.innerHTML =
+      '<p>He was tired. The <span class="iw-word" data-lemma="gossamer">gossamer</span> veil shone.</p>';
+    const span = document.querySelector('span.iw-word') as HTMLElement;
+    const vocab = createVocabStore(fakeStorage());
+    const popover = createPopover({
+      lookup: async () => ({ entry: ENTRY, source: 'core' }),
+      vocab,
+      onStatusChange: vi.fn(),
+    });
+
+    await popover.openFor(span, 'gossamer');
+    const learningBtn = popover._card.querySelector<HTMLButtonElement>(
+      'button[data-status="learning"]',
+    )!;
+    expect(popover._card.textContent).not.toContain('Recently met'); // nothing captured yet
+
+    learningBtn.click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    const entry = await vocab.getEntry('gossamer');
+    expect(entry?.status).toBe('learning');
+    expect(entry?.examples?.[0]?.text).toBe('The gossamer veil shone.');
+    // The open card shows the capture without a reopen.
+    expect(popover._card.textContent).toContain('Recently met');
+    expect(popover._card.textContent).toContain('The gossamer veil shone.');
+    popover.close();
+  });
+
+  it('does not capture anything when the anchor is gone (SIP-002)', async () => {
+    const { popover, vocab } = makePopover();
+    await popover.openFor(null, 'observe'); // no anchor at all
+    const learningBtn = popover._card.querySelector<HTMLButtonElement>(
+      'button[data-status="learning"]',
+    )!;
+    learningBtn.click();
+    await new Promise((r) => setTimeout(r, 0));
+    const entry = await vocab.getEntry('observe');
+    expect(entry?.status).toBe('learning');
+    expect(entry?.examples).toBeUndefined();
+    popover.close();
+  });
 });

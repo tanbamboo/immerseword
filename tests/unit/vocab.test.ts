@@ -69,4 +69,53 @@ describe('vocab store', () => {
     expect((await store.getEntry('ephemeral'))?.status).toBe('known');
     expect((await store.getEntry('ephemeral'))?.timesSeen).toBe(3);
   });
+
+  it('addExample records sentences newest-first, capped at three', async () => {
+    const store = createVocabStore(setup.storage);
+    await store.setStatus('gossamer', 'learning');
+    for (const n of ['first', 'second', 'third', 'fourth']) {
+      await store.addExample('gossamer', { text: `the ${n} sentence.`, url: `https://a.example/${n}` });
+    }
+    const entry = await store.getEntry('gossamer');
+    expect(entry?.examples?.map((e) => e.text)).toEqual([
+      'the fourth sentence.',
+      'the third sentence.',
+      'the second sentence.',
+    ]);
+    expect(entry?.examples?.[0]?.url).toBe('https://a.example/fourth');
+    expect(entry?.examples?.[0]?.capturedAt).toBeGreaterThan(0);
+  });
+
+  it('addExample dedupes identical text and refreshes its recency', async () => {
+    const store = createVocabStore(setup.storage);
+    await store.addExample('petrichor', { text: 'one.', url: 'https://a/1' });
+    await store.addExample('petrichor', { text: 'two.', url: 'https://a/2' });
+    const older = (await store.getEntry('petrichor'))?.examples?.find((e) => e.text === 'one.');
+    await new Promise((r) => setTimeout(r, 2)); // capturedAt advances
+    await store.addExample('petrichor', { text: 'one.', url: 'https://a/1-again' });
+    const entry = await store.getEntry('petrichor');
+    expect(entry?.examples?.map((e) => e.text)).toEqual(['one.', 'two.']);
+    expect(entry?.examples?.[0]?.url).toBe('https://a/1-again');
+    expect(entry?.examples?.[0]?.capturedAt).toBeGreaterThan(older!.capturedAt);
+  });
+
+  it('addExample creates a missing entry defaulting to unknown', async () => {
+    const store = createVocabStore(setup.storage);
+    const entry = await store.addExample('quixotic', { text: 'seen once.', url: 'https://a/' });
+    expect(entry.status).toBe('unknown');
+    expect(entry.examples).toHaveLength(1);
+    expect((await store.getEntry('quixotic'))?.examples?.[0]?.text).toBe('seen once.');
+  });
+
+  it('setStatus and bumpLookup preserve captured examples', async () => {
+    const store = createVocabStore(setup.storage);
+    await store.setStatus('ephemeral', 'learning');
+    await store.addExample('ephemeral', { text: 'a sentence.', url: 'https://a/' });
+    await store.setStatus('ephemeral', 'known');
+    await store.bumpLookup('ephemeral');
+    const entry = await store.getEntry('ephemeral');
+    expect(entry?.status).toBe('known');
+    expect(entry?.lookupCount).toBe(1);
+    expect(entry?.examples?.map((e) => e.text)).toEqual(['a sentence.']);
+  });
 });

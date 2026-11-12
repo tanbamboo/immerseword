@@ -65,3 +65,73 @@ PR merges. Append-only — never rewrite a merged proposal.
   fragments re-tagged as broken lemmas ("erendipity") — extract() now
   unwraps our markup in the clone so the reader presents the pristine
   article.
+
+## SIP-002 — Learning words capture the sentence where they were met
+
+- **Requested:** 2026-11-12 (`feat-2026-11-12-001`)
+- **Motivation:** the sentence a learner actually met a word in is the
+  most personal example they can keep — it carries the context, the
+  topic, and the memory of the encounter. Today `VocabEntry` keeps only
+  counters/timestamps and that context is lost: "I want it to record
+  the surrounding sentence around the word as an example in my personal
+  language lifecycle".
+- **Scope:**
+  1. When the user classifies a word as **Learning** from the popover,
+     the sentence containing the clicked occurrence is captured into
+     the word's vocab entry (confirmation from the reporter: capture
+     happens only at the Learning click itself, not on later lookups —
+     re-clicking Learning on later encounters accumulates sentences).
+  2. The popover gains a **"Recently met"** section listing the ≤3
+     most recent captured sentences (newest first, source page +
+     date), shown for both the definition and no-definition states.
+  3. Captured examples survive export/import with the vocabulary.
+- **UX sketch:**
+  - click tagged word → popover → "Learning" → the sentence is saved
+    and the "Recently met" section appears immediately in the open
+    popover (no reopen needed)
+  - section sits between the dictionary senses and the status buttons;
+    each item is the sentence in quotes (dictionary-example styling)
+    with a small `hostname · date` source line; hidden while empty
+- **Technical approach:**
+  - `VocabEntry.examples?: VocabExample[]` (`{ text, url, capturedAt }`,
+    `url` = origin + pathname, query/hash stripped for privacy);
+    optional field → no migration, all readers tolerate `undefined`
+  - new `VocabStore.addExample(lemma, { text, url })`: unshift newest,
+    dedupe on exact text (re-encounter moves it to the front and
+    refreshes `capturedAt`), cap at `MAX_WORD_EXAMPLES = 3` (write-time
+    trim, same idea as the dictionary LRU cache); `setStatus`/
+    `bumpLookup` rebuilt entries field-by-field and now preserve
+    `examples`
+  - new `src/content/sentence.ts` `extractSentence(anchor)`: resolve the
+    popover anchor (tag span or selection Range) to a (node, offset),
+    locate the enclosing block (`p, li, h1–h6, blockquote, td, …`,
+    `div` fallback), compute the anchor's char offset in the block's
+    textContent with a TreeWalker, then cut at the nearest sentence
+    boundaries (`.!?…` + closing quotes/brackets + whitespace);
+    whitespace-normalized, capped at 300 chars around the word
+  - capture lives in `popover.onStatus` (the only place with both the
+    lemma and the DOM anchor); side-panel classification has no page
+    DOM and simply doesn't capture
+  - export payload version bumps 1 → 2 (additive field, import accepts
+    both; examples validated item-by-item like the other fields)
+- **Test plan:** unit — sentence extraction (nested inline markup,
+  multi-sentence blocks, Range anchors, truncation, detached anchor);
+  `addExample` cap/dedupe/preserve; popover renders the section and
+  captures on the Learning click; dataio round-trip preserves examples
+  and v1 imports still work. e2e — Learning click on a fixture page
+  captures the sentence into storage and shows it in the popover; a
+  second Learning click on another occurrence adds a second item,
+  newest first; existing gates green.
+- **Risks:** naive segmentation splits on abbreviations ("Mr.", "e.g.")
+  — acceptable v1; capture is best-effort (detached anchor → skipped);
+  storage growth bounded (≤3 × ~300 chars per learning word); examples
+  never leave the device (PRD §8 unchanged in substance).
+- **Docs:** PRD F2 (popover section) + F5 (data model + capture rule) +
+  §8 privacy note; ADR-0003 amended (personal examples in the vocab
+  layer).
+- **Outcome:** implemented in PR-18 (`pr/18-learning-example-sentences`).
+  Gates: typecheck, unit 124/124, e2e 33/33. One e2e test needed a
+  fix during development: the fixture article already mentions
+  "gossamer", so the new spec clicks the span inside its own injected
+  paragraph instead of the first page-wide match (the capture itself
+  worked on the first run).
