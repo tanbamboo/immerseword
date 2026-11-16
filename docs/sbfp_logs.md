@@ -374,3 +374,53 @@ merges. Append-only — never rewrite a merged proposal.
   default after the assertion so later specs see the stock configuration.
 - **Outcome:** fixed in PR-23 (`pr/23-pass1-marks-selector`). Gates:
   typecheck, unit 138/138, e2e 37/37.
+
+---
+
+## SBFP-009 — store upload rejected: `key` field in packaged manifest
+
+- **Reported:** 2026-11-16 (`bug-2026-11-16-002`)
+- **Symptom:** uploading the submission zip to the Chrome Web Store
+  Developer Dashboard fails with "There was a problem uploading your file.
+  Please try again. key field is not allowed in manifest."
+- **Root cause:** `public/manifest.json` pins a public `key`
+  (`scripts/gen-key.mjs`) so the unpacked dev extension has a deterministic
+  ID — the e2e harness *requires* it (`harness.mjs` throws without it and
+  derives the ID from the DER key). The store, however, assigns its own
+  key/ID at upload and its validator rejects any submitted manifest that
+  already contains `key`. The submission zip was produced by zipping
+  `dist/` as-is, so the dev `key` shipped inside it. Nothing in the repo
+  produced a store-legal package — the defect is a missing packaging step,
+  not a wrong manifest.
+- **Evidence:** dashboard error above; `public/manifest.json` `key` field;
+  `tests/e2e/harness.mjs:28` (`manifest.json has no "key" — run
+  node scripts/gen-key.mjs`); the zip was created manually via
+  `zip -qr ../immerseword-1.0.0.zip .` from `dist/` (2026-11-16 session).
+- **Fix:**
+  - `scripts/package.mjs` (new): stages `dist/` to a temp dir, removes the
+    `key` field from the staged `manifest.json` (dev `dist/` and the e2e
+    pipeline keep the key), validates the staged manifest still parses and
+    still matches `dist/` otherwise, then zips the staging dir to
+    `immerseword-<version>.zip` at the repo root via the system `zip`.
+  - `package.json`: `npm run package` = `npm run build && node
+    scripts/package.mjs` — one command to a store-legal artifact; the
+    output zip is already gitignored (`immerseword-*.zip`).
+  - `tests/unit/package.test.ts` (new): the key-stripper removes only
+    `key` (everything else byte-identical, version untouched); a
+    regression guard asserts `public/manifest.json` still *has* the key
+    (the e2e stable-ID contract stays locked).
+  - `CHROMEWEBSTORE.md` packaging notes: upload package must come from
+    `npm run package`, never a raw zip of `dist/`.
+- **Verification plan:** unit — stripper + key-presence guards; shell —
+    `npm run package`, then `unzip -p` the artifact and assert no `key`
+    member while `dist/manifest.json` still has it; standard gates green
+    (e2e re-proves the dev key path).
+- **Risks / edge cases:** after the store assigns its own ID, the
+    published extension ID will differ from the dev ID (expected; noted in
+    packaging notes — nothing today depends on the public ID); if the
+    system lacks `zip`, the script fails loudly (same class of local-tool
+    dependency the repo already has via puppeteer/sharp).
+- **Outcome:** fixed in PR-26 (`pr/26-package-without-key`). Gates:
+  typecheck, unit 140/140, e2e 37/37. Packaged artifact verified:
+  zip manifest has no `key` member (`unzip -p immerseword-1.0.0.zip
+  manifest.json`), while `dist/manifest.json` keeps the pinned dev key.

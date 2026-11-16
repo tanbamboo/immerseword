@@ -137,4 +137,19 @@ report's arrival time in session.)*
 > itself — see SBFP-008: both the light DOM and the reader's shadow DOM
 > were affected.)*
 
+---
+
+## bug-2026-11-16-002 — store upload rejected: "key field is not allowed in manifest"
+
+**Recorded:** 2026-11-16 13:17 +0800
+**Source:** user report (ZCode session — Chrome Web Store Developer Dashboard)
+**Status:** fixed — PR-26 (`pr/26-package-without-key`); see SBFP-009
+
+**Raw report:**
+
+> when I upload the zip file to developer dashboard, I got this:
+>
+> There was a problem uploading your file. Please try again.
+> key field is not allowed in manifest.
+
 
