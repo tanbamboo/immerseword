@@ -424,3 +424,57 @@ merges. Append-only — never rewrite a merged proposal.
   typecheck, unit 140/140, e2e 37/37. Packaged artifact verified:
   zip manifest has no `key` member (`unzip -p immerseword-1.0.0.zip
   manifest.json`), while `dist/manifest.json` keeps the pinned dev key.
+
+---
+
+## SBFP-010 — dashboard icon upload fails: icons 3.125× declared size, no guideline-compliant store icon
+
+- **Reported:** 2026-11-16 (`bug-2026-11-16-003`)
+- **Symptom:** uploading the 128×128 icon to the Developer Dashboard
+  fails; user asks for a new store icon per
+  https://developer.chrome.com/webstore/images#icons.
+- **Root cause (two layers):**
+  1. `scripts/gen-icons.mjs` renders the SVG with `density: 300`, but
+     sharp/librsvg treats SVG user units as 72 dpi — every "128px" icon
+     comes out **533×533** (128 × 300/72), "48" as 200×200, "16" as
+     67×67. Chrome scales manifest icons to whatever it needs without
+     validating dimensions, so dev loads and e2e never surfaced it; the
+     dashboard, however, validates strictly and rejects a 533×533 upload
+     in the 128-icon slot.
+  2. Even at the right size, the manifest icon is the wrong *artwork
+     format* for the dashboard: the store guidelines require the icon
+     upload to be 128×128 PNG whose square artwork occupies ~96×96 with
+     ~16 px of transparent padding per side (full-bleed opaque images get
+     auto-framed; edges/shadows discouraged; must work on light and dark
+     backgrounds). No such artifact existed — the dashboard upload needs
+     its own file, distinct from the in-zip manifest icons.
+- **Evidence:** `sharp('public/icons/icon-128.png').metadata()` →
+  533×533 (also 16→67, 48→200); `gen-icons.mjs` line
+  `sharp(Buffer.from(svg(size)), { density: 300 })` with no resize;
+  guidelines page (fetched 2026-11-16): "The actual icon size should be
+  96x96 … an additional 16 pixels per side should be transparent
+  padding, adding up to 128x128 total image size."
+- **Fix:**
+  - `gen-icons.mjs`: after the density-300 render (kept for crisp
+    text), `resize(size, size)` to the exact declared pixel size —
+    outputs are now truly 16/48/128.
+  - New store-icon artifact: same script renders
+    `store/icons/store-icon-128.png` — 128×128 RGBA, brand tile
+    artwork at 96×96 centered (16 px transparent padding per side),
+    flat, front-facing, no edge, legible on light and dark.
+  - `CHROMEWEBSTORE.md`: store-icon row points at the new artifact with
+    the guideline rationale; notes manifest icons ≠ store upload.
+- **Verification plan:** script asserts each output's metadata matches
+  its declared size (hard error otherwise, so density regressions
+  can't slip through again); store icon verified 128×128 with alpha
+  and an opaque bounding box of ~96×96 centered; standard gates green
+  (e2e reloads the extension with the resized manifest icons).
+- **Risks / edge cases:** manifest icons change pixel size (533→128
+  etc.) — content identical after downscale, and correct-sized source
+  art is strictly better for toolbar rendering; store icon keeps the
+  transparent padding so the store renders the artwork unframed, per
+  the "no alpha → auto 12px rounded frame" note in the guidelines.
+- **Outcome:** fixed in PR-27 (`pr/27-store-icon`). Gates: typecheck,
+  unit 140/140, e2e 37/37. Verified: manifest icons exactly
+  16/48/128 px; `store/icons/store-icon-128.png` is 128×128 RGBA with
+  a 96×96 opaque artwork box centered (16 px padding).
