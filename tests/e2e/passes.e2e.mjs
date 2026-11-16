@@ -194,4 +194,57 @@ export const tests = [
       });
     },
   },
+  {
+    name: 'pass 1 shows faint candidate marks when the setting is on (bug-2026-11-16-001)',
+    async run() {
+      await withHarness(async ({ browser, baseUrl }) => {
+        const { page, watcher } = await openArticle(browser, baseUrl);
+        const panel = await openPanel(browser, page);
+
+        // Opt into faint marks (F6: Pass 1 behavior), as the options page does.
+        await panel.evaluate(
+          () =>
+            new Promise((resolve) => {
+              chrome.storage.sync.get(['iw:settings'], (found) => {
+                chrome.storage.sync.set(
+                  { 'iw:settings': { ...found['iw:settings'], pass1ShowMarks: true } },
+                  () => resolve(),
+                );
+              });
+            }),
+        );
+        // The content script applies the attribute on the settings change.
+        await page.waitForFunction(() => document.documentElement.dataset.iwP1Marks === '1', {
+          timeout: 5_000,
+        });
+
+        const session = await startSession(panel);
+        assert.equal(session?.pass, 1);
+        await page.waitForFunction(() => document.documentElement.dataset.iwPass === '1', {
+          timeout: 5_000,
+        });
+
+        // Candidates render faint dots in pass 1 — the stray-bracket selector
+        // dropped this rule in the light DOM before.
+        assert.equal(await decorationOf(page, 'observe'), 'underline|dotted');
+
+        // Restore the stock configuration for later specs.
+        await panel.evaluate(
+          () =>
+            new Promise((resolve) => {
+              chrome.storage.sync.get(['iw:settings'], (found) => {
+                chrome.storage.sync.set(
+                  { 'iw:settings': { ...found['iw:settings'], pass1ShowMarks: false } },
+                  () => resolve(),
+                );
+              });
+            }),
+        );
+
+        watcher.assertClean();
+        await panel.close();
+        await page.close();
+      });
+    },
+  },
 ];

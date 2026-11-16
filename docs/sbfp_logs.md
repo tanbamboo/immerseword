@@ -317,3 +317,60 @@ merges. Append-only — never rewrite a merged proposal.
   surfaced when the first e2e run of the repro stayed red after layers 1–2 —
   the fix was extended with the popover `vocabKey` and verified with the
   real-corpus ranks (evening 2352 / even 253).
+
+---
+
+## SBFP-008 — Pass 1 "faint candidate marks" never renders (light DOM and reader)
+
+- **Reported:** 2026-11-16 (`bug-2026-11-16-001`, found by code analysis)
+- **Symptom:** with F6's "Pass 1 behavior" set to *faint marks*
+  (`pass1ShowMarks: true`), candidate words in Pass 1 show **no decoration**
+  anywhere — identical to the hide-entirely mode, on regular pages and in
+  the immersive reader alike.
+- **Root cause:** in `tag-css.ts`, the compound Pass 1 selector was built by
+  passing `attr('data-iw-pass="1"][data-iw-p1-marks]')` — the argument
+  already closed its own bracket, and `attr()` appends the closing bracket,
+  emitting `html[data-iw-pass="1"][data-iw-p1-marks]]` (and the
+  `:host-context(...)` shadow equivalent). CSS error recovery silently drops
+  the entire rule. The hand-copied `public/content/content.css` faithfully
+  reproduced the broken generator output, so every scope was affected.
+  (Initial analysis blamed the hand copy and credited the generator —
+  the parity test added below disproved that within the first run: the
+  mismatch sat on the generated side.)
+- **Evidence:** `src/content/tag-css.ts` `passCss()` line
+  `${attr('data-iw-pass="1"][data-iw-p1-marks]')}` vs `attr()`'s
+  `` (a) => `html[${a}]` ``; the committed file and the generated CSS both
+  contain `p1-marks]]`. Every other rule matches. Nothing caught it: no
+  test compared file with generated source, and the e2e pass tests run
+  with the default `pass1ShowMarks: false`, so the rule never fired under
+  test.
+- **Fix:**
+  - `src/content/tag-css.ts`: `attr()` now takes variadic `name="value"`
+    expressions and adds all brackets itself (`html[a][b]`); the compound
+    rule passes two arguments. Bracket-closing lives in exactly one place.
+  - `public/content/content.css`: drop the stray `]` so the hand copy
+    matches the corrected generator (dist/ refreshes on the next
+    `npm run build`; it is untracked build output).
+  - `tests/unit/content-css.test.ts` (new): the generated
+    `TAG_CSS + tagStyleCss('light') + passCss('light')` must appear in the
+    committed file (whitespace-normalized containment) — the "keep in
+    sync" invariant becomes machine-checked; plus an exact-selector
+    assertion for the p1-marks rule in both scopes.
+  - `tests/e2e/passes.e2e.mjs` (new case): enable `pass1ShowMarks` via
+    `chrome.storage.sync` from the panel, start a session, assert a
+    candidate computes `underline|dotted` in Pass 1 — render-level proof
+    in a real browser, in the default-off configuration the suite never
+    covered.
+- **Verification plan:** unit — parity test passes on the fixed pair and
+  fails if any generated rule drifts; exact-selector test pins the
+  compound selector. e2e — new Pass 1 case shows faint candidate marks
+  (`underline|dotted`) while the default-mode case still shows none;
+  existing gates green.
+- **Risks / edge cases:** the parity test pins the file to the generated
+  source — future tag-CSS changes must be made in `tag-css.ts` and the
+  file regenerated (the documented workflow; the header already instructs
+  it). Whitespace normalization tolerates formatting drift only, which is
+  the intent. The e2e case mutates `chrome.storage.sync`; it restores the
+  default after the assertion so later specs see the stock configuration.
+- **Outcome:** fixed in PR-23 (`pr/23-pass1-marks-selector`). Gates:
+  typecheck, unit 138/138, e2e 37/37.
