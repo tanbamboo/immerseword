@@ -73,3 +73,16 @@ Analysis and implementation live in [../sip_logs.md](../sip_logs.md).
 > when I use the extension, can it also display the synonyms of the word?
 > like 'English Thesaurus' dictionary
 
+
+---
+
+## feat-2026-11-16-002 — synonyms as plain words, not tag-style chips
+
+**Recorded:** 2026-11-16 16:05 +0800
+**Source:** user request (ZCode session)
+**Status:** implemented — PR-29 (`pr/29-synonym-style`); see SIP-006
+
+**Raw request:**
+
+> the display of synonyms is bad, maybe bold or underline when hover
+> over, just not display them as tags.

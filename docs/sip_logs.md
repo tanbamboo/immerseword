@@ -298,3 +298,37 @@ PR merges. Append-only — never rewrite a merged proposal.
   real data-file dump (begin's synsets) grounded the fix: word/lex-id
   pairs strictly alternate, and the regression fixture is the actual
   WordNet line.
+
+---
+
+## SIP-006 — synonyms restyled: inline words, underline on hover (SIP-005 follow-up)
+
+- **Requested:** 2026-11-16 (`feat-2026-11-16-002`)
+- **Motivation:** SIP-005 shipped synonyms as pill-shaped chips; the
+  reporter finds the tag look visually loud ("the display of synonyms is
+  bad") and asks for plain words with a hover affordance instead.
+- **Scope:** presentation-only change in `popover.ts` — same data, same
+  `.syn-w` click-to-look-up behavior and class contract (tests keep
+  working). No PRD/ADR impact (F2's "shown as chips" wording is updated
+  to "inline words").
+- **UX sketch:**
+  ```
+  Synonyms
+  detect, find, discover, notice — each word plain indigo text;
+  hover underlines it; a tap looks it up.
+  ```
+- **Technical approach:** reset the chip style (no border/background/
+  radius/padding), inline flow, comma separators via `::after` on all
+  but the last word; hover = underline (not bold — bold reflows text
+  width mid-hover, underline is layout-stable). Buttons remain buttons
+  (keyboard focus + click) with `cursor: pointer` and the existing
+  indigo accent signaling interactivity.
+- **Test plan:** existing SIP-005 unit/e2e tests already assert class,
+  contents, and click behavior — they must stay green unchanged; no new
+  assertions beyond style intent (house rule: don't unit-test CSS).
+- **Risks / edge cases:** none functional — pure stylesheet change;
+  `::after` separators are not part of `textContent`, so lookup-by-text
+  in e2e is unaffected.
+- **Outcome:** implemented in PR-29 (`pr/29-synonym-style`). Gates:
+  typecheck, unit 149/149, e2e 38/38 — the SIP-005 assertions passed
+  unchanged, as expected for a stylesheet-only change.

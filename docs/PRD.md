@@ -92,8 +92,9 @@ pedagogically sound.
     example on demand (also recorded automatically at the Learning click)
   - numbered monolingual senses (up to 3), each with one example sentence when available
   - **Synonyms row** (SIP-005): up to 8 same-synset words from the bundled
-    WordNet data (or the API fallback), shown as chips; tapping a chip looks
-    that word up — English-only thesaurus browsing
+    WordNet data (or the API fallback), shown as plain inline words —
+    hover underlines; tapping a word looks it up — English-only thesaurus
+    browsing (SIP-006: plain words, not tag-style chips)
   - status buttons: **Known / Learning / Unknown / Ignore**
   - "Recently met" section: the ≤3 most recent sentences in which the learner met the
     word (each with source page and date), newest first, with every form of the word
