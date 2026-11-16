@@ -89,6 +89,50 @@ export const tests = [
     },
   },
   {
+    name: 'popover shows WordNet synonyms; a chip tap looks the word up (SIP-005)',
+    async run() {
+      await withHarness(async ({ browser, baseUrl }) => {
+        const page = await openArticle(browser, baseUrl);
+        await clickWord(page, 'observe');
+
+        await page.waitForFunction(
+          () =>
+            document
+              .getElementById('iw-popover-host')
+              ?.shadowRoot?.querySelector('.card .lemma')?.textContent === 'observe',
+          { timeout: 15_000 },
+        );
+        // Same-synset chips from the bundled WordNet data.
+        const chips = await page.evaluate(() => [
+          ...document
+            .getElementById('iw-popover-host')
+            .shadowRoot.querySelectorAll('.syn-w'),
+        ].map((c) => c.textContent));
+        assert.ok(
+          chips.includes('discover') && chips.length > 1,
+          `expected observe's synonym chips, got: ${JSON.stringify(chips)}`,
+        );
+
+        // Tap a chip → thesaurus browsing: popover re-opens for that word.
+        await page.evaluate(() => {
+          [...document.getElementById('iw-popover-host').shadowRoot.querySelectorAll('.syn-w')]
+            .find((c) => c.textContent === 'discover')
+            .click();
+        });
+        await page.waitForFunction(
+          () =>
+            document
+              .getElementById('iw-popover-host')
+              ?.shadowRoot?.querySelector('.card .lemma')?.textContent === 'discover',
+          { timeout: 15_000 },
+        );
+        const text = await cardText(page);
+        assert.ok(text?.length, 'discover entry renders');
+        await page.close();
+      });
+    },
+  },
+  {
     name: 'double-clicking an untagged word opens the popover',
     async run() {
       await withHarness(async ({ browser, baseUrl }) => {
