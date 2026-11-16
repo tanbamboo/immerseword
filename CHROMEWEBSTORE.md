@@ -48,18 +48,28 @@ English
 | Asset | Dimensions | Status | Filename |
 |-------|-----------|--------|----------|
 | Store Icon [REQUIRED] | 128×128 PNG | ✅ Ready (reuse) | `public/icons/icon-128.png` |
-| Screenshot 1 [REQUIRED] | 1280×800 | ✅ Ready — BBC article, popover on "trilateral" with definition + status buttons | `store/screenshots/screenshot-1-1280x800.png` |
-| Screenshot 2 [RECOMMENDED] | 1280×800 | ⬜ Not created — 3-pass pass pill + quieted page |
-| Screenshot 3 [RECOMMENDED] | 1280×800 | ✅ Ready — immersive reader, sepia theme | `store/screenshots/screenshot-3-1280x800.png` |
+| Screenshot 1 [REQUIRED] | 1280×800 | ✅ Ready — BBC article, popover on "proliferation" from the offline dictionary, with definition + status buttons | `store/screenshots/screenshot-1-offline-1280x800.png` |
+| Screenshot 2 [RECOMMENDED] | 1280×800 | ✅ Ready — 3-pass pass pill (Pass 1 Gist) + quieted page | `store/screenshots/screenshot-2-gist-1280x800.png` |
+| Screenshot 3 [RECOMMENDED] | 1280×800 | ✅ Ready — immersive reader, sepia theme | `store/screenshots/screenshot-3-sepia-1280x800.png` |
 | Screenshot 4 [RECOMMENDED] | 1280×800 | ⬜ Not created — side panel stats + vocabulary browser |
 | Small Promo Tile [RECOMMENDED] | 440×280 | ⬜ Not created |
 | Marquee Promo Tile | 1400×560 | ⬜ Not created |
 
+**Screenshot set** (dashboard allows up to 5; suggested upload order):
+
+1. `screenshot-1-offline-1280x800.png` — popover, offline dictionary (REQUIRED slot 1)
+2. `screenshot-2-study-1280x800.png` — Pass 2 pill, full tagging (most informative pass)
+3. `screenshot-2-gist-1280x800.png` — Pass 1 pill, quieted page
+4. `screenshot-3-sepia-1280x800.png` — immersive reader, sepia
+5. `screenshot-3-dark-1280x800.png` — immersive reader, dark (theme range)
+
+Alternates not in the top 5: `screenshot-1-online-1280x800.png` (popover sourced from the dictionaryapi.dev fallback), `screenshot-2-fluency-1280x800.png` (Pass 3 pill), `screenshot-3-light-1280x800.png`.
+
 ### Screenshot Notes
 
-Capture on a real news/blog article (not the test fixture) with the extension loaded unpacked. Screenshot 1 must show the popover with an English-only definition — it communicates the core function in one glance. No annotations needed; the UI is self-explanatory.
+Screenshot 1 must show the popover with an English-only definition — it communicates the core function in one glance. No annotations needed; the UI is self-explanatory.
 
-Screenshots live in `store/screenshots/` (NEVER in `public/` — `scripts/build.mjs` copies `public/` verbatim into `dist/` and store assets must not ship inside the extension package). Raw 2× captures (`screenshot-N@2x.png`, 3360×2100) are retained alongside the exact-1280×800 uploads the dashboard requires. Captured 2026-11-14 on BBC News; visible browser/OS chrome (macOS menu bar, tab strip) is acceptable but the captures may be re-cropped to the viewport only before submission if preferred.
+Screenshots live in `store/screenshots/` (NEVER in `public/` — `scripts/build.mjs` copies `public/` verbatim into `dist/` and store assets must not ship inside the extension package). Raw 2× captures (2560px wide, `*-@2x.png`) are retained alongside the exact-1280×800 uploads the dashboard requires; regenerate a final with `sips -z 800 1280 <raw> --out <final>`. All captures taken 2026-11-16 on BBC News with Chrome at a 1280×800 window (Retina 2×).
 
 ## Permissions Justification
 
@@ -112,11 +122,11 @@ Draft privacy-policy substance: ImmerseWord stores all learning data locally; ma
 
 **Publisher Name** [REQUIRED]
 
-[tanbamboo — confirm display name before submission]
+[Benjamin Tan]
 
 **Contact Email** [REQUIRED]
 
-[TODO: publisher email]
+[tanbamboo@gmail.com]
 
 **Support URL / Email** [RECOMMENDED]
 
