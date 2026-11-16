@@ -118,4 +118,23 @@ report's arrival time in session.)*
 > candidate, the word is not been tagged, no matter I choose "Learning" or
 > "Unknown". it should be tagged and underlined.
 
+---
+
+## bug-2026-11-16-001 — Pass 1 "faint candidate marks" setting never renders
+
+**Recorded:** 2026-11-16 08:51 +0800
+**Source:** code analysis finding (ZCode session); user approved filing it
+**Status:** fixed — PR-23 (`pr/23-pass1-marks-selector`); see SBFP-008
+
+**Raw report:**
+
+> Project analysis found a stray bracket in the Pass 1 selector of
+> `public/content/content.css`: `html[data-iw-pass="1"][data-iw-p1-marks]]`
+> (extra `]` before ` span.iw-word`). The invalid selector is silently
+> dropped by the browser, so the optional "faint candidate marks in Pass 1"
+> setting (F6: Pass 1 behavior — hide tags vs. faint marks) never renders.
+> *(Verification during fix traced the stray bracket to the generator
+> itself — see SBFP-008: both the light DOM and the reader's shadow DOM
+> were affected.)*
+
 

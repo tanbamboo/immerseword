@@ -53,10 +53,15 @@ span.iw-word[data-iw-status="ignored"] {
  */
 export type CssScope = 'light' | 'shadow';
 
-function scoped(scope: CssScope): { bare: string; attr: (a: string) => string } {
-  return scope === 'shadow'
-    ? { bare: ':host-context(html)', attr: (a) => `:host-context(html[${a}])` }
-    : { bare: 'html', attr: (a) => `html[${a}]` };
+function scoped(scope: CssScope): { bare: string; attr: (...attrs: string[]) => string } {
+  const wrap = (inner: string): string =>
+    scope === 'shadow' ? `:host-context(${inner})` : inner;
+  return {
+    bare: wrap('html'),
+    // Each argument is one `name="value"` expression; brackets are added
+    // here only — callers never close them (bug-2026-11-16-001).
+    attr: (...attrs: string[]) => wrap(`html[${attrs.join('][')}]`),
+  };
 }
 
 /** Applies the decoration variables, placed per settings.tagStyle. */
@@ -106,7 +111,7 @@ ${attr('data-iw-pass="3"')} span.iw-word[data-iw-status="learning"] {
   --iw-decor-offset: 3px;
   --iw-decor-position: auto;
 }
-${attr('data-iw-pass="1"][data-iw-p1-marks]')} span.iw-word[data-iw-status="candidate"] {
+${attr('data-iw-pass="1"', 'data-iw-p1-marks')} span.iw-word[data-iw-status="candidate"] {
   --iw-decor-line: underline;
   --iw-decor-style: dotted;
   --iw-decor-color: rgb(120 113 108 / 0.3);

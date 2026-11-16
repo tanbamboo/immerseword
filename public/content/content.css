@@ -81,7 +81,7 @@ html[data-iw-pass="3"] span.iw-word[data-iw-status="learning"] {
   --iw-decor-offset: 3px;
   --iw-decor-position: auto;
 }
-html[data-iw-pass="1"][data-iw-p1-marks]] span.iw-word[data-iw-status="candidate"] {
+html[data-iw-pass="1"][data-iw-p1-marks] span.iw-word[data-iw-status="candidate"] {
   --iw-decor-line: underline;
   --iw-decor-style: dotted;
   --iw-decor-color: rgb(120 113 108 / 0.3);
