@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createDictionaryService, normalizeApiEntry, type CoreDictionary } from '../../src/background/dictionary';
+import {
+  cleanSynonyms,
+  createDictionaryService,
+  normalizeApiEntry,
+  type CoreDictionary,
+} from '../../src/background/dictionary';
 import { DEFAULT_SETTINGS, type IwSettings } from '../../src/shared/types';
 
 function fakeStorage() {
@@ -18,13 +23,16 @@ function fakeStorage() {
 }
 
 const CORE: CoreDictionary = {
-  study: [['n', 'a detailed critical inspection']],
-  happy: [['a', 'enjoying or showing joy'], ['adj2', 'well expressed']],
-  shape: [['n', 'the external form of something'], ['v', 'give form to']],
-  roughly: [['r', 'about; approximately']],
-  rough: [['a', 'having an uneven surface']],
-  market: [['n', 'a place where goods are traded']],
-  hope: [['v', 'expect and wish']],
+  study: { s: [['n', 'a detailed critical inspection']] },
+  happy: {
+    s: [['a', 'enjoying or showing joy'], ['adj2', 'well expressed']],
+    syn: ['Felicitous', 'glad', 'glad', 'happy', 'x', 'well'],
+  },
+  shape: { s: [['n', 'the external form of something'], ['v', 'give form to']] },
+  roughly: { s: [['r', 'about; approximately']] },
+  rough: { s: [['a', 'having an uneven surface']] },
+  market: { s: [['n', 'a place where goods are traded']] },
+  hope: { s: [['v', 'expect and wish']] },
 };
 
 function apiResponse(lemma: string) {
@@ -223,5 +231,46 @@ describe('normalizeApiEntry', () => {
     expect(normalizeApiEntry('x', [])).toBeNull();
     expect(normalizeApiEntry('x', [{ word: 'x' }])).toBeNull();
     expect(normalizeApiEntry('x', [{ word: 'x', meanings: [{ definitions: [] }] }])).toBeNull();
+  });
+});
+
+describe('synonyms (SIP-005)', () => {
+  it('core entries carry cleaned same-synset words', async () => {
+    const { service } = makeService();
+    const result = await service.lookup('happy');
+    expect(result.source).toBe('core');
+    // lowercased, deduped, headword and single letters dropped
+    expect(result.entry?.synonyms).toEqual(['felicitous', 'glad', 'well']);
+  });
+
+  it('entries without syn data simply have no synonyms', async () => {
+    const { service } = makeService();
+    expect((await service.lookup('study')).entry?.synonyms).toBeUndefined();
+  });
+
+  it('normalizes API synonyms from meanings and definitions', () => {
+    const entry = normalizeApiEntry('serendipity', [
+      {
+        word: 'serendipity',
+        meanings: [
+          {
+            partOfSpeech: 'noun',
+            synonyms: ['lucky strike', 'fluke'],
+            definitions: [
+              { definition: 'good luck in discovery', synonyms: ['serendipity', 'FLUKE', 'chance'] },
+            ],
+          },
+        ],
+      },
+    ]);
+    // multiword dropped, case folded, deduped, headword excluded
+    expect(entry?.synonyms).toEqual(['fluke', 'chance']);
+  });
+
+  it('cleanSynonyms caps at 8', () => {
+    const words = Array.from({ length: 12 }, (_, i) => `w${'abcdefghijkl'[i]}${'mnopqrstuvwxyz'[i]}`);
+    expect(words).toHaveLength(12); // e.g. wam, wbn … letter-only, all valid
+    expect(cleanSynonyms(words, 'lemma')).toHaveLength(8);
+    expect(cleanSynonyms('not-an-array' as never, 'lemma')).toEqual([]);
   });
 });

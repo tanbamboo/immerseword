@@ -21,7 +21,11 @@ dictionaryapi.dev is free/keyless but network-dependent and rate-limit-unspecifi
    ~1.5–3 MB JSON. Loaded by the SW on demand and kept in memory of the SW instance
    (reloadable; not persisted state). *(Amended 2026-11-10: originally "shortest gloss",
    which picked terse-but-rare senses like beautiful → "of weather"; first-sense ordering
-   is the correct default.)*
+   is the correct default.)* *(Amended 2026-11-16, SIP-005: each entry also carries the
+   member lemmas of those same synsets as a capped synonym list — WordNet is
+   synonym-set-organized, so synonyms are a free by-product of the same parse; value
+   shape is `{ s: <senses>, syn?: [≤8 words] }`. The API tier normalizes its own
+   `synonyms` arrays into the same field.)*
 2. **Free Dictionary API** (`https://api.dictionaryapi.dev/api/v2/entries/en/<word>`) for
    anything missing — full entries: phonetics, senses, examples. Normalized to our
    internal `DictionaryEntry` shape.

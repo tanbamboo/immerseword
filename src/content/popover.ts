@@ -75,6 +75,14 @@ const STYLE = `
   .met .ex { margin: 5px 0 0; }
   .met .ex mark { background: #fde68a; color: inherit; font-style: italic; border-radius: 2px; padding: 0 1px; }
   .met-src { font-size: 10.5px; color: #9aa5b1; margin: 1px 0 0; }
+  .syn { margin-top: 10px; }
+  .syn-h { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: #9aa5b1; }
+  .syn-w {
+    display: inline-block; margin: 5px 4px 0 0; padding: 2px 9px;
+    border: 1px solid #c7d2fe; background: #eef2ff; color: #4338ca;
+    border-radius: 999px; font-size: 12px; cursor: pointer;
+  }
+  .syn-w:hover { background: #e0e7ff; border-color: #4f46e5; }
 `;
 
 const STATUS_LABELS: Array<[WordStatus, string]> = [
@@ -236,6 +244,26 @@ export function createPopover(deps: PopoverDeps) {
     return `${host} · ${new Date(example.capturedAt).toISOString().slice(0, 10)}`;
   }
 
+  /** SIP-005: thesaurus row — tapping a chip looks that word up. */
+  function synonymsSection(words: string[]): HTMLElement {
+    const section = document.createElement('div');
+    section.className = 'syn';
+    const header = document.createElement('div');
+    header.className = 'syn-h';
+    header.textContent = 'Synonyms';
+    section.append(header);
+    for (const word of words) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'syn-w';
+      chip.textContent = word;
+      chip.title = `Look up “${word}”`;
+      chip.addEventListener('click', () => void openFor(currentAnchor, word));
+      section.append(chip);
+    }
+    return section;
+  }
+
   function renderEntry(lemma: string, entry: DictionaryEntry, source: string, vocabEntry?: VocabEntry): void {
     const activeStatus = vocabEntry?.status;
     card.innerHTML = '';
@@ -262,6 +290,10 @@ export function createPopover(deps: PopoverDeps) {
         wrap.append(ex);
       }
       card.append(wrap);
+    }
+
+    if (entry.synonyms?.length) {
+      card.append(synonymsSection(entry.synonyms));
     }
 
     if (vocabEntry?.examples?.length) {

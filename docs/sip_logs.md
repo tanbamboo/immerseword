@@ -234,3 +234,67 @@ PR merges. Append-only — never rewrite a merged proposal.
   Gates: typecheck, unit 131/131, e2e 35/35. The SIP-001 tag-style
   e2e's hand-built settings payload was extended with the new field so
   it keeps writing a complete settings object.
+
+---
+
+## SIP-005 — synonyms in the popover (offline WordNet synsets + API)
+
+- **Requested:** 2026-11-16 (`feat-2026-11-16-001`)
+- **Motivation:** after seeing a definition, the natural learner question is
+  "what else could I say here?" — a thesaurus row turns each lookup into a
+  small word-family exploration, still monolingual (English→English), still
+  offline-first. WordNet is organized as synonym sets, so the data is
+  already inside the pipeline; the API fallback also returns synonyms.
+- **Scope:**
+  1. `dict-core.json` gains a per-lemma synonym list: the union of the
+     member lemmas of the same synsets the entry already shows (first
+     sense per POS — same offsets the definitions come from), deduped,
+     headword excluded, single-word lowercase lemmas only (no
+     multi-word/proper), capped at 8.
+  2. `DictionaryEntry.synonyms?: string[]` (≤8); API normalization
+     collects `meanings[].synonyms` + per-definition synonyms the same
+     way.
+  3. Popover renders a "Synonyms" section between the senses and the
+     status row — compact chips; clicking a chip looks that word up
+     (popover re-opens for it) — lightweight thesaurus browsing.
+- **UX sketch:**
+  ```
+  │ happy  /ˈhæpi/  +  ✕        │
+  │ ADJ enjoying or showing joy  │
+  │ Synonyms: [glad] [felicitous]│
+  │ ──────────────────────────── │
+  │ [Known][Learning][Unknown][Ignore] │
+  ```
+- **Technical approach:** `build-data.mjs` parses synset member lemmas from
+  the WordNet data-file record head (fields after `w_cnt`; hex count,
+  single-digit sense markers dropped); `dict-core.json` value shape becomes
+  `{ s: <senses>, syn?: [words] }` (reader updated in the same PR — the
+  file is regenerated and bundled atomically). `dictionary.ts` maps `syn`
+  into `DictionaryEntry.synonyms` and extends API normalization with the
+  same dedupe/cap rules. `popover.ts` renders chips that call the existing
+  `openFor` lookup path; vocab keying for a clicked synonym defaults to the
+  word itself (WordNet members are base forms).
+- **Test plan:** unit — data builder extracts lemmas from a synset head
+  line (markers/multiword filtered, cap applied); dictionary service maps
+  core `syn` and API synonyms; popover renders the section, hides it when
+  empty, and a chip click re-opens with the clicked word. e2e — popover
+  for a bundled word shows its synonym chips and clicking one shows the
+  synonym's own definition.
+- **Risks / edge cases:** synset-mate synonyms are sense-scoped (first
+  senses only) — polysemous words show synonyms of the common senses,
+  which matches the definitions shown right above; data size grows
+  (measured before/after in the PR); antonyms exist in WordNet pointers
+  but are out of scope (candidate future SIP); shape change of
+  dict-core.json is internal to the bundle (single reader, regenerated in
+  the same PR).
+- **Docs:** PRD F2 synonyms bullet; ADR-0002 amendment (synonyms sourced
+  from the same synsets).
+- **Outcome:** implemented in PR-28 (`pr/28-synonyms`). Gates: typecheck,
+  unit 149/149, e2e 38/38 (new case: observe's chips render and tapping
+  "discover" re-opens its entry, asserted in real Chrome). Data:
+  dict-core.json 1.20 → 1.54 MB, 6,797/10,090 entries carry synonyms;
+  full-set junk scan clean. The first synset parse attempt misread hex
+  lex_ids ("get c") and pointer POS letters ("n", "v") as lemmas — the
+  real data-file dump (begin's synsets) grounded the fix: word/lex-id
+  pairs strictly alternate, and the regression fixture is the actual
+  WordNet line.

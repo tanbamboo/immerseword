@@ -6,7 +6,8 @@
  *    frequency (Google Trillion Word Corpus list, MIT). Rank = index + 1.
  *  - dict-core.json : monolingual definitions for the top CORE_LIMIT
  *    frequency lemmas that exist in WordNet 3.1 (Princeton WordNet License).
- *    Value: lemma → up to one sense per POS as [posCode, definition, example?].
+ *    Value (SIP-005): lemma → { s: up to one sense per POS as
+ *    [posCode, definition, example?], syn?: ≤8 same-synset words }.
  *  - ATTRIBUTION.md : licenses for everything bundled.
  *
  * The extension itself never runs this; outputs are committed so builds stay
@@ -16,13 +17,37 @@
 import { createRequire } from 'node:module';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const DATA_DIR = resolve(process.cwd(), 'public', 'data');
 const FREQ_URL =
   'https://raw.githubusercontent.com/first20hours/google-10000-english/master/20k.txt';
 const CORE_LIMIT = 15_000;
-const SENSES_PER_POS = 3; // synsets examined per POS; shortest gloss wins
+const SENSES_PER_POS = 3; // synsets examined per POS; first (most common) sense wins
+const SYN_CAP = 8; // max synonyms stored per lemma (SIP-005)
+
+/**
+ * SIP-005: single-word member lemmas of one synset head. `fields` is a
+ * WordNet data-file record head split on whitespace
+ * (`offset lex_filenum ss_type w_cnt word lex_id … p_cnt …`). w_cnt is
+ * hex and every word is followed by exactly one HEX lex_id ("get c" =
+ * lex_id c), so the lemma list is strictly alternating word/lex-id pairs;
+ * parsing must stop after w_cnt words or it reads pointer symbols and
+ * pointer-target POS letters ("n", "v") as lemmas. Multi-word lemmas
+ * ("get_down") and marker-carrying forms fail the single-word filter.
+ */
+export function synsetLemmas(fields) {
+  const count = parseInt(fields[3] ?? '0', 16);
+  if (!Number.isFinite(count) || count <= 0) return [];
+  const out = [];
+  for (let k = 0; k < count; k++) {
+    const word = fields[4 + k * 2];
+    if (word === undefined) break;
+    if (/^[a-z]{2,}$/.test(word)) out.push(word);
+  }
+  return out;
+}
 
 async function main() {
   mkdirSync(DATA_DIR, { recursive: true });
@@ -75,14 +100,14 @@ async function main() {
     return map;
   }
 
-  /** offset → [ssType, gloss] for one POS data file. */
+  /** offset → [ssType, gloss, memberLemmas] for one POS data file. */
   function parseData(file) {
     const map = new Map();
     for (const line of readFileSync(resolve(dictDir, file), 'utf8').split('\n')) {
       const bar = line.indexOf(' | ');
       if (bar < 0) continue;
       const head = line.slice(0, bar).split(/\s+/);
-      map.set(head[0], [head[2], line.slice(bar + 3).trim()]);
+      map.set(head[0], [head[2], line.slice(bar + 3).trim(), synsetLemmas(head)]);
     }
     return map;
   }
@@ -95,27 +120,27 @@ async function main() {
   const coreLemmas = words.slice(0, CORE_LIMIT);
   for (const lemma of coreLemmas) {
     const senses = [];
+    const syns = []; // SIP-005: same-synset words, sense order, deduped below
     POS_FILES.forEach((pos, i) => {
       const offsets = indices[i].get(lemma);
       if (!offsets) return;
-      let best = null;
       for (const off of offsets.slice(0, SENSES_PER_POS)) {
         const entry = datas[i].get(off);
         if (!entry) continue;
+        for (const mate of entry[2]) {
+          if (mate !== lemma) syns.push(mate);
+        }
         const raw = entry[1];
         const q = raw.indexOf('"');
         const definition = (q < 0 ? raw : raw.slice(0, q)).trim();
-        if (!definition) continue;
+        if (!definition || senses.some((s) => s[0] === pos.code)) continue;
         const example = q >= 0 ? raw.slice(q + 1).split('"')[0]?.trim() : undefined;
-        const candidate = [pos.code, definition, ...(example ? [example] : [])];
-        // WordNet index offsets are ordered by sense frequency: the first
-        // synset is the most common sense, so we keep it — not the shortest.
-        if (!best) best = candidate;
+        senses.push([pos.code, definition, ...(example ? [example] : [])]);
       }
-      if (best) senses.push(best);
     });
     if (senses.length > 0) {
-      core[lemma] = senses;
+      const syn = [...new Set(syns)].slice(0, SYN_CAP);
+      core[lemma] = syn.length > 0 ? { s: senses, syn } : { s: senses };
       matched += 1;
     }
   }
@@ -146,7 +171,10 @@ WordNet® is a registered trademark of Princeton University.
   console.log('ATTRIBUTION.md written');
 }
 
-main().catch((err) => {
-  console.error('[build-data] failed:', err);
-  process.exit(1);
-});
+// Run as CLI unless imported (unit tests import synsetLemmas).
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main().catch((err) => {
+    console.error('[build-data] failed:', err);
+    process.exit(1);
+  });
+}

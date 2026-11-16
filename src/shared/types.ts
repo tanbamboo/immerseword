@@ -88,6 +88,8 @@ export interface DictionaryEntry {
   lemma: string;
   phonetic?: string;
   senses: DictionarySense[];
+  /** ≤8 same-synset words (SIP-005); absent when neither source has any. */
+  synonyms?: string[];
 }
 
 export interface DictionarySense {

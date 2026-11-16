@@ -60,3 +60,16 @@ Analysis and implementation live in [../sip_logs.md](../sip_logs.md).
 > can let user make the choice in settings, such as 3 options(320px, 480px,
 > 640px)? and the "+" button should after the IPA when it's availble.
 
+---
+
+## feat-2026-11-16-001 — show synonyms in the popover, like an English thesaurus
+
+**Recorded:** 2026-11-16 14:51 +0800
+**Source:** user request (ZCode session)
+**Status:** implemented — PR-28 (`pr/28-synonyms`); see SIP-005
+
+**Raw request:**
+
+> when I use the extension, can it also display the synonyms of the word?
+> like 'English Thesaurus' dictionary
+

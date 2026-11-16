@@ -292,3 +292,43 @@ describe('popover', () => {
     popover.close();
   });
 });
+
+describe('synonyms section (SIP-005)', () => {
+  it('renders synonym chips and looks the clicked word up', async () => {
+    const entries = new Map<string, DictionaryEntry | null>([
+      ['happy', {
+        lemma: 'happy',
+        senses: [{ partOfSpeech: 'adjective', definition: 'enjoying or showing joy' }],
+        synonyms: ['felicitous', 'glad'],
+      }],
+      ['glad', {
+        lemma: 'glad',
+        senses: [{ partOfSpeech: 'adjective', definition: 'showing or causing joy' }],
+      }],
+    ]);
+    const lookup = vi.fn(async (word: string) => ({
+      entry: entries.get(word) ?? null,
+      source: 'core',
+    }));
+    const popover = createPopover({ lookup, vocab: createVocabStore(fakeStorage()) });
+
+    await popover.openFor(null, 'happy');
+    const chips = [...popover._card.querySelectorAll<HTMLButtonElement>('.syn-w')];
+    expect(chips.map((c) => c.textContent)).toEqual(['felicitous', 'glad']);
+    expect(popover._card.querySelector('.syn-h')?.textContent).toBe('Synonyms');
+
+    chips[1]?.click();
+    await vi.waitFor(() => {
+      expect(popover._card.querySelector('.lemma')?.textContent).toBe('glad');
+    });
+    expect(lookup).toHaveBeenCalledWith('glad');
+    popover.close();
+  });
+
+  it('keeps the section hidden for entries without synonyms', async () => {
+    const { popover } = makePopover(); // ENTRY has no synonyms field
+    await popover.openFor(null, 'observe');
+    expect(popover._card.querySelector('.syn')).toBeNull();
+    popover.close();
+  });
+});

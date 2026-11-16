@@ -11,8 +11,14 @@
 import { createLemmatizer } from '../shared/lemmatizer';
 import type { DictionaryEntry, DictionarySense, IwSettings } from '../shared/types';
 
-/** dict-core.json value: lemma → senses of [posCode, definition, example?]. */
-export type CoreDictionary = Record<string, Array<[string, string] | [string, string, string]>>;
+/** dict-core.json value (SIP-005): lemma → senses + same-synset synonyms. */
+export interface CoreEntry {
+  s: Array<[string, string] | [string, string, string]>;
+  syn?: string[];
+}
+export type CoreDictionary = Record<string, CoreEntry>;
+
+const SYN_CAP = 8; // mirrors the build-time cap (SIP-005)
 
 const POS_LABEL: Record<string, string> = {
   n: 'noun',
@@ -79,11 +85,11 @@ export function createDictionaryService(deps: DictionaryDeps) {
   };
 
   function fromCore(lemma: string, data: CoreDictionary | null): DictionaryEntry | null {
-    const senses = data?.[lemma];
-    if (!senses || senses.length === 0) return null;
-    return {
+    const found = data?.[lemma];
+    if (!found?.s || found.s.length === 0) return null;
+    const entry: DictionaryEntry = {
       lemma,
-      senses: senses.map((s) => {
+      senses: found.s.map((s) => {
         const sense: DictionarySense = {
           partOfSpeech: POS_LABEL[s[0]] ?? s[0],
           definition: s[1],
@@ -92,6 +98,9 @@ export function createDictionaryService(deps: DictionaryDeps) {
         return sense;
       }),
     };
+    const syns = cleanSynonyms(found.syn ?? [], lemma);
+    if (syns.length > 0) entry.synonyms = syns;
+    return entry;
   }
 
   async function readCache(lemma: string): Promise<LookupResult | null> {
@@ -172,6 +181,23 @@ export function createDictionaryService(deps: DictionaryDeps) {
   };
 }
 
+/** Dedupes, headword-excludes, caps a raw synonym list (SIP-005). */
+export function cleanSynonyms(raw: unknown, lemma: string): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== 'string') continue;
+    const word = item.toLowerCase().trim();
+    if (word === lemma || seen.has(word)) continue;
+    if (!/^[a-z]{2,}$/.test(word)) continue; // single letters, multiword, junk
+    seen.add(word);
+    out.push(word);
+    if (out.length >= SYN_CAP) break;
+  }
+  return out;
+}
+
 /** Maps a Free Dictionary API response array to our DictionaryEntry shape. */
 export function normalizeApiEntry(lemma: string, body: unknown): DictionaryEntry | null {
   if (!Array.isArray(body) || body.length === 0) return null;
@@ -180,15 +206,19 @@ export function normalizeApiEntry(lemma: string, body: unknown): DictionaryEntry
     phonetics?: Array<{ text?: string }>;
     meanings?: Array<{
       partOfSpeech?: string;
-      definitions?: Array<{ definition?: string; example?: string }>;
+      synonyms?: string[];
+      definitions?: Array<{ definition?: string; example?: string; synonyms?: string[] }>;
     }>;
   };
   const phonetic =
     first.phonetic ?? first.phonetics?.map((p) => p.text).find((t) => !!t && t.length > 0);
   const senses: DictionarySense[] = [];
+  const rawSyns: string[] = [];
   for (const meaning of first.meanings ?? []) {
+    rawSyns.push(...(meaning.synonyms ?? []));
     const def = meaning.definitions?.[0];
     if (!def?.definition) continue;
+    rawSyns.push(...(def.synonyms ?? []));
     const sense: DictionarySense = {
       partOfSpeech: meaning.partOfSpeech,
       definition: def.definition,
@@ -200,5 +230,7 @@ export function normalizeApiEntry(lemma: string, body: unknown): DictionaryEntry
   if (senses.length === 0) return null;
   const entry: DictionaryEntry = { lemma, senses };
   if (phonetic) entry.phonetic = phonetic;
+  const syns = cleanSynonyms(rawSyns, lemma);
+  if (syns.length > 0) entry.synonyms = syns;
   return entry;
 }
