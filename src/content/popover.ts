@@ -77,12 +77,15 @@ const STYLE = `
   .met-src { font-size: 10.5px; color: #9aa5b1; margin: 1px 0 0; }
   .syn { margin-top: 10px; }
   .syn-h { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: #9aa5b1; }
+  /* SIP-006: plain inline words — no tag chrome; hover underlines (layout-stable). */
   .syn-w {
-    display: inline-block; margin: 5px 4px 0 0; padding: 2px 9px;
-    border: 1px solid #c7d2fe; background: #eef2ff; color: #4338ca;
-    border-radius: 999px; font-size: 12px; cursor: pointer;
+    display: inline; margin: 0; padding: 0;
+    border: 0; background: none; border-radius: 0;
+    font: inherit; font-size: 12.5px; color: #4338ca; cursor: pointer;
   }
-  .syn-w:hover { background: #e0e7ff; border-color: #4f46e5; }
+  .syn-w::after { content: ", "; color: #616e7c; }
+  .syn-w:last-child::after { content: ""; }
+  .syn-w:hover { text-decoration: underline; color: #4f46e5; }
 `;
 
 const STATUS_LABELS: Array<[WordStatus, string]> = [
