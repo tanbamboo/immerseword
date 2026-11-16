@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 
+# Store submission packages (regenerated: zip the contents of dist/)
+immerseword-*.zip
+
 # Test artifacts
 coverage/
 .playwright/
