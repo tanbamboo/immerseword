@@ -47,7 +47,7 @@ English
 
 | Asset | Dimensions | Status | Filename |
 |-------|-----------|--------|----------|
-| Store Icon [REQUIRED] | 128×128 PNG | ✅ Ready (reuse) | `public/icons/icon-128.png` |
+| Store Icon [REQUIRED] | 128×128 PNG, 96×96 artwork + 16px transparent padding/side | ✅ Ready — regenerate with `npm run gen:icons` | `store/icons/store-icon-128.png` |
 | Screenshot 1 [REQUIRED] | 1280×800 | ✅ Ready — BBC article, popover on "proliferation" from the offline dictionary, with definition + status buttons | `store/screenshots/screenshot-1-offline-1280x800.png` |
 | Screenshot 2 [RECOMMENDED] | 1280×800 | ✅ Ready — 3-pass pass pill (Pass 1 Gist) + quieted page | `store/screenshots/screenshot-2-gist-1280x800.png` |
 | Screenshot 3 [RECOMMENDED] | 1280×800 | ✅ Ready — immersive reader, sepia theme | `store/screenshots/screenshot-3-sepia-1280x800.png` |
@@ -68,6 +68,8 @@ Alternates not in the top 5: `screenshot-1-online-1280x800.png` (popover sourced
 ### Screenshot Notes
 
 Screenshot 1 must show the popover with an English-only definition — it communicates the core function in one glance. No annotations needed; the UI is self-explanatory.
+
+**Store icon ≠ manifest icons.** The dashboard upload follows the [store icon guidelines](https://developer.chrome.com/webstore/images#icons): 128×128 PNG whose square artwork occupies 96×96 with 16px of transparent padding per side (transparent padding keeps the store from auto-framing; artwork must read on light and dark backgrounds). Use `store/icons/store-icon-128.png`. The full-bleed `public/icons/icon-*.png` are *manifest* icons (inside the zip) — never upload those to the dashboard (uploading the old `icon-128.png` failed because it was actually 533×533, see `bug-2026-11-16-003`).
 
 Screenshots live in `store/screenshots/` (NEVER in `public/` — `scripts/build.mjs` copies `public/` verbatim into `dist/` and store assets must not ship inside the extension package). Raw 2× captures (2560px wide, `*-@2x.png`) are retained alongside the exact-1280×800 uploads the dashboard requires; regenerate a final with `sips -z 800 1280 <raw> --out <final>`. All captures taken 2026-11-16 on BBC News with Chrome at a 1280×800 window (Retina 2×).
 

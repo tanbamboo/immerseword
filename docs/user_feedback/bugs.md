@@ -152,4 +152,18 @@ report's arrival time in session.)*
 > There was a problem uploading your file. Please try again.
 > key field is not allowed in manifest.
 
+---
+
+## bug-2026-11-16-003 — store icon upload fails; icon PNGs are 3.125× their declared size
+
+**Recorded:** 2026-11-16 13:33 +0800
+**Source:** user report (ZCode session — Chrome Web Store Developer Dashboard)
+**Status:** fixed — PR-27 (`pr/27-store-icon`); see SBFP-010
+
+**Raw report:**
+
+> when I upload the 128x128 icon in dashboard, it failed. please create a
+> new store icon following image guildlines at:
+> https://developer.chrome.com/webstore/images#icons
+
 
