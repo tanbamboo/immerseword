@@ -48,9 +48,9 @@ English
 | Asset | Dimensions | Status | Filename |
 |-------|-----------|--------|----------|
 | Store Icon [REQUIRED] | 128×128 PNG | ✅ Ready (reuse) | `public/icons/icon-128.png` |
-| Screenshot 1 [REQUIRED] | 1280×800 | ⬜ Not created — article with tagged words + popover open |
+| Screenshot 1 [REQUIRED] | 1280×800 | ✅ Ready — BBC article, popover on "trilateral" with definition + status buttons | `store/screenshots/screenshot-1-1280x800.png` |
 | Screenshot 2 [RECOMMENDED] | 1280×800 | ⬜ Not created — 3-pass pass pill + quieted page |
-| Screenshot 3 [RECOMMENDED] | 1280×800 | ⬜ Not created — immersive reader, sepia theme |
+| Screenshot 3 [RECOMMENDED] | 1280×800 | ✅ Ready — immersive reader, sepia theme | `store/screenshots/screenshot-3-1280x800.png` |
 | Screenshot 4 [RECOMMENDED] | 1280×800 | ⬜ Not created — side panel stats + vocabulary browser |
 | Small Promo Tile [RECOMMENDED] | 440×280 | ⬜ Not created |
 | Marquee Promo Tile | 1400×560 | ⬜ Not created |
@@ -58,6 +58,8 @@ English
 ### Screenshot Notes
 
 Capture on a real news/blog article (not the test fixture) with the extension loaded unpacked. Screenshot 1 must show the popover with an English-only definition — it communicates the core function in one glance. No annotations needed; the UI is self-explanatory.
+
+Screenshots live in `store/screenshots/` (NEVER in `public/` — `scripts/build.mjs` copies `public/` verbatim into `dist/` and store assets must not ship inside the extension package). Raw 2× captures (`screenshot-N@2x.png`, 3360×2100) are retained alongside the exact-1280×800 uploads the dashboard requires. Captured 2026-11-14 on BBC News; visible browser/OS chrome (macOS menu bar, tab strip) is acceptable but the captures may be re-cropped to the viewport only before submission if preferred.
 
 ## Permissions Justification
 
@@ -97,7 +99,7 @@ Capture on a real news/blog article (not the test fixture) with the extension lo
 
 **Privacy Policy URL** [REQUIRED]
 
-`https://github.com/tanbamboo/immerseword/blob/main/docs/PRIVACY.md` — TODO before submission: publish `docs/PRIVACY.md` from this repository (draft content below) and verify the URL renders publicly.
+`https://github.com/tanbamboo/immerseword/blob/main/docs/PRIVACY.md` — ✅ verified 2026-11-16: the repository is public and `docs/PRIVACY.md` is on `main`, so the URL renders for anyone.
 
 Draft privacy-policy substance: ImmerseWord stores all learning data locally; makes requests only to api.dictionaryapi.dev for words the user explicitly looks up that are missing from the offline dictionary (disableable); contains no analytics, ads, or accounts.
 
