@@ -153,8 +153,16 @@ https://github.com/tanbamboo/immerseword
 
 ### Packaging Notes
 
-- ZIP for submission must exclude `.git/`, `node_modules/`, `tests/`, `scripts/`, `docs/`, `CHROMEWEBSTORE.md`, and dev files — only the contents of `dist/` belong in the package.
-- `manifest.json` contains a `key` pinning the development extension ID; keep it for stable dev IDs. After publishing, replace OAuth- or ID-dependent setup if any is added later (none today).
+- Build the submission artifact with **`npm run package`** (never zip `dist/` by
+  hand): it stages `dist/`, strips the `key` member from the staged manifest —
+  the dashboard rejects any upload containing `key` (`bug-2026-11-16-002`) —
+  and writes `immerseword-<version>.zip` at the repo root. The zip contains
+  only extension files (no `.git/`, `node_modules/`, `tests/`, `scripts/`,
+  `docs/`, `store/`).
+- `public/manifest.json` pins a dev `key` for a stable unpacked-load ID (the
+  e2e harness depends on it); it must stay. Consequence: after publishing,
+  the **store-assigned extension ID will differ from the dev ID** — nothing
+  today depends on the public ID (no OAuth, no hardcoded extension URLs).
 
 ### Rejection History
 

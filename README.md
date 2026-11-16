@@ -38,6 +38,7 @@ npm run build          # typecheck → bundles → dist/ (loadable unpacked exte
 npm test               # unit tests (Vitest)
 npm run test:e2e       # build + real-Chrome E2E (Puppeteer)
 npm run build:data     # regenerate public/data (maintainers; outputs are committed)
+npm run package        # build + store-legal zip (strips the dev "key") for upload
 ```
 
 Load in Chrome: `chrome://extensions` → Developer mode → *Load unpacked* → `dist/`.
