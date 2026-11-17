@@ -86,3 +86,17 @@ Analysis and implementation live in [../sip_logs.md](../sip_logs.md).
 
 > the display of synonyms is bad, maybe bold or underline when hover
 > over, just not display them as tags.
+
+---
+
+## feat-2026-11-17-001 — tap words inside definitions to chain lookups
+
+**Recorded:** 2026-11-17 09:37 +0800
+**Source:** user request (ZCode session)
+**Status:** implemented — PR-30 (`pr/30-definition-links`); see SIP-007
+
+**Raw request:**
+
+> when I lookup the word "copiously", I got "adverb, In a copious
+> manner", but I still can't comprehend the meaning. maybe should let me
+> click on the "copious" to lookup the definition of it.

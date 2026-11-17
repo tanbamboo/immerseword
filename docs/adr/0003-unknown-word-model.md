@@ -72,3 +72,13 @@ records the current sentence through the same `addExample` path (a word is
 marked Learning only once, so later encounters need their own affordance).
 Example rendering highlights every form of the word by resolving sentence
 tokens through the shared lemmatizer at display time; no schema change.
+
+**2026-11-17 (PR-30, feat-2026-11-17-001).** The layer-1 rarity rule gains a
+second consumer: inside dictionary-popover definitions and sense examples,
+words whose resolved form is rarer than the user's level (and not
+known/ignored in the personal vocabulary, and not forms of the headword
+itself) render as tappable — dotted underline, tap re-opens the popover for
+that word (SIP-007). This addresses circular WordNet glosses for derived
+forms ("copiously — in a copious manner"): the unknown word inside a
+definition is one tap away, using exactly the same unknown-word model that
+tags pages, so link density automatically follows the learner's level.

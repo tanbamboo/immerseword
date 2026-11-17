@@ -91,6 +91,10 @@ pedagogically sound.
   - **"+" button** beside the headword records the current sentence as a personal
     example on demand (also recorded automatically at the Learning click)
   - numbered monolingual senses (up to 3), each with one example sentence when available
+  - **tappable words inside definitions** (SIP-007): words in a definition
+    or example that are rarer than the user's level render with a dotted
+    underline; tapping one looks it up — circular glosses
+    ("copiously — in a copious manner") become a guided chain
   - **Synonyms row** (SIP-005): up to 8 same-synset words from the bundled
     WordNet data (or the API fallback), shown as plain inline words —
     hover underlines; tapping a word looks it up — English-only thesaurus
