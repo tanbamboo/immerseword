@@ -395,3 +395,103 @@ describe('tappable definition words (SIP-007)', () => {
     popover.close();
   });
 });
+
+describe('restrictive link rules + stacked navigation (SIP-008)', () => {
+  function entryWithDefinition(definition: string): DictionaryEntry {
+    return { lemma: 'word', senses: [{ definition }] };
+  }
+
+  it('never links single letters, capitalized, CamelCase, or apostrophe forms', async () => {
+    const entry = entryWithDefinition(
+      'A O In a copious manner, VirusTotal URLs and don\'t stop Copious quickly',
+    );
+    const popover = createPopover({
+      lookup: async () => ({ entry, source: 'core' }),
+      vocab: createVocabStore(fakeStorage()),
+      isLinkable: () => true, // predicate accepts everything — guards must reject
+    });
+    await popover.openFor(null, 'word');
+    const linked = [...popover._card.querySelectorAll('.def-w')].map((b) => b.textContent);
+    // Survivors in order of appearance: pure lowercase, ≥3 letters only.
+    expect(linked).toEqual(['copious', 'manner', 'and', 'stop', 'quickly']);
+    // Explicitly: never A, O, In, Copious, VirusTotal, URLs, don't
+    for (const bad of ['A', 'O', 'In', 'Copious', 'VirusTotal', 'URLs', "don't"]) {
+      expect(linked).not.toContain(bad);
+    }
+    popover.close();
+  });
+
+  it('double-clicking a word in the card opens it stacked, Back returns', async () => {
+    const lookups: string[] = [];
+    const entries: Record<string, DictionaryEntry> = {
+      observe: {
+        lemma: 'observe',
+        senses: [{ definition: 'to watch with great attention repeatedly' }],
+      },
+      attention: {
+        lemma: 'attention',
+        senses: [{ definition: 'the act of close observation' }],
+      },
+    };
+    const popover = createPopover({
+      lookup: async (w) => {
+        lookups.push(w);
+        return { entry: entries[w] ?? { lemma: w, senses: [{ definition: `def of ${w}` }] }, source: 'core' };
+      },
+      vocab: createVocabStore(fakeStorage()),
+      isLinkable: () => false,
+    });
+    await popover.openFor(null, 'observe');
+    expect(popover._card.querySelector('.back')).toBeNull(); // root: no Back
+
+    // Simulate the native dblclick: word selection + bubbling dblclick (detail 2)
+    // on the definition text (the same gesture the page-level e2e reproduces).
+    await selectWordInCard(popover._card, 'attention');
+    await popover._card.querySelector('.def')!.dispatchEvent(
+      new MouseEvent('dblclick', { bubbles: true, detail: 2 }),
+    );
+    await vi.waitFor(() => {
+      expect(popover._card.querySelector('.lemma')?.textContent).toBe('attention');
+    });
+    expect(popover._card.querySelector('.back')?.textContent).toContain('Back');
+
+    // Back restores the original entry instantly — no second lookup.
+    const lookupCount = lookups.length;
+    (popover._card.querySelector('.back') as HTMLButtonElement).click();
+    expect(popover._card.querySelector('.lemma')?.textContent).toBe('observe');
+    expect(popover._card.querySelector('.back')).toBeNull();
+    expect(lookups.length).toBe(lookupCount);
+    popover.close();
+  });
+
+  it('double-clicking a button does not navigate', async () => {
+    const lookup = vi.fn(async () => ({
+      entry: { lemma: 'observe', senses: [{ definition: 'to watch' }] } as DictionaryEntry,
+      source: 'core',
+    }));
+    const popover = createPopover({ lookup, vocab: createVocabStore(fakeStorage()) });
+    await popover.openFor(null, 'observe');
+    await selectWordInCard(popover._card, 'watch');
+    const status = popover._card.querySelector('.status-row button') as HTMLButtonElement;
+    status.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(lookup).toHaveBeenCalledTimes(1); // only the root lookup
+    expect(popover._card.querySelector('.lemma')?.textContent).toBe('observe');
+    popover.close();
+  });
+});
+
+/** Sets the document selection to a word inside the popover card (helper). */
+async function selectWordInCard(card: HTMLElement, word: string): Promise<void> {
+  const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode() as Text | null;
+  while (node && !node.nodeValue?.includes(word)) node = walker.nextNode() as Text | null;
+  if (!node) throw new Error(`word ${word} not found in card`);
+  const idx = node.nodeValue!.indexOf(word);
+  const range = document.createRange();
+  range.setStart(node, idx);
+  range.setEnd(node, idx + word.length);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+}
