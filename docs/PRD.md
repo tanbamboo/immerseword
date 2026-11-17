@@ -94,7 +94,14 @@ pedagogically sound.
   - **tappable words inside definitions** (SIP-007): words in a definition
     or example that are rarer than the user's level render with a dotted
     underline; tapping one looks it up — circular glosses
-    ("copiously — in a copious manner") become a guided chain
+    ("copiously — in a copious manner") become a guided chain. Restrictive
+    candidate rule (SIP-008): only pure lowercase words of ≥3 letters are
+    ever recommended — never single letters ("A"/"O"), capitalized words,
+    acronyms, or apostrophe forms
+  - **stacked navigation** (SIP-008): in-popover lookups (tapped
+    candidates, synonym words, or a double-click on any word in the card)
+    open the new entry over the original; "‹ Back" returns instantly to
+    the entry underneath
   - **Synonyms row** (SIP-005): up to 8 same-synset words from the bundled
     WordNet data (or the API fallback), shown as plain inline words —
     hover underlines; tapping a word looks it up — English-only thesaurus

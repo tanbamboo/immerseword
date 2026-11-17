@@ -224,6 +224,59 @@ export const tests = [
                 ?.shadowRoot?.querySelector('.card .lemma')?.textContent === 'existence',
             { timeout: 15_000, polling: 500 },
           );
+
+          // SIP-008: the chained entry floats over the original — Back returns.
+          const backText = await page.evaluate(
+            () =>
+              document
+                .getElementById('iw-popover-host')
+                .shadowRoot.querySelector('.back')?.textContent,
+          );
+          assert.ok(backText?.includes('Back'), 'Back button visible on the stacked entry');
+          await page.evaluate(() => {
+            document.getElementById('iw-popover-host').shadowRoot.querySelector('.back').click();
+          });
+          await page.waitForFunction(
+            () =>
+              document
+                .getElementById('iw-popover-host')
+                ?.shadowRoot?.querySelector('.card .lemma')?.textContent === 'observe',
+            { timeout: 15_000, polling: 500 },
+          );
+          const backGone = await page.evaluate(
+            () =>
+              document
+                .getElementById('iw-popover-host')
+                .shadowRoot.querySelector('.back') === null,
+          );
+          assert.ok(backGone, 'Back hidden again at the root entry');
+
+          // SIP-008: double-click any word in the card — "determine" (rank
+          // 1888) is not a recommended link even at 2k, only dblclick reaches
+          // it. Reproduce the gesture: selection + bubbling dblclick (detail 2).
+          await page.evaluate(() => {
+            const card = document.getElementById('iw-popover-host').shadowRoot.querySelector('.card');
+            const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT);
+            let node = walker.nextNode();
+            while (node && !node.nodeValue.includes('determine')) node = walker.nextNode();
+            const idx = node.nodeValue.indexOf('determine');
+            const range = document.createRange();
+            range.setStart(node, idx);
+            range.setEnd(node, idx + 'determine'.length);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+            card.querySelector('.def').dispatchEvent(
+              new MouseEvent('dblclick', { bubbles: true, detail: 2 }),
+            );
+          });
+          await page.waitForFunction(
+            () =>
+              document
+                .getElementById('iw-popover-host')
+                ?.shadowRoot?.querySelector('.card .lemma')?.textContent === 'determine',
+            { timeout: 15_000, polling: 500 },
+          );
         } finally {
           // Restore the stock level for later specs.
           await panel.evaluate(

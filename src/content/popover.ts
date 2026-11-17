@@ -100,6 +100,13 @@ const STYLE = `
     text-decoration-thickness: 1px; text-underline-offset: 2px;
   }
   .def-w:hover { text-decoration-style: solid; color: #4f46e5; }
+  /* SIP-008: stacked navigation — Back returns to the entry underneath. */
+  .back {
+    flex: none; align-self: center; margin-right: 2px;
+    border: 0; background: transparent; cursor: pointer;
+    font-size: 12px; color: #616e7c; padding: 2px 6px; border-radius: 6px;
+  }
+  .back:hover { background: #efece4; color: #1f2933; }
 `;
 
 const STATUS_LABELS: Array<[WordStatus, string]> = [
@@ -127,6 +134,18 @@ export function createPopover(deps: PopoverDeps) {
   let currentVocabKey: string | null = null;
   let currentAnchor: HTMLElement | Range | null = null;
   let lookupSeq = 0;
+
+  /** SIP-008: a rendered popover state, restorable via Back. */
+  interface NavState {
+    lemma: string;
+    vocabKey: string;
+    entry: DictionaryEntry | null;
+    source: string;
+    vocabEntry?: VocabEntry;
+  }
+  /** Entries underneath the current one; Back pops and re-renders. */
+  const navStack: NavState[] = [];
+  let currentNav: NavState | null = null;
 
   function renderLoading(lemma: string): void {
     card.innerHTML = '';
@@ -157,10 +176,19 @@ export function createPopover(deps: PopoverDeps) {
     card.style.top = `${Math.max(8, y)}px`;
   }
 
-  /** Head row: lemma, phonetic, the SIP-003 "+" recorder, close. */
+  /** Head row: optional Back (SIP-008), lemma, phonetic, the SIP-003 "+" recorder, close. */
   function headRow(displayLemma: string, phonetic?: string): HTMLElement {
     const head = document.createElement('div');
     head.className = 'head';
+    if (navStack.length > 0) {
+      const back = document.createElement('button');
+      back.className = 'back';
+      back.type = 'button';
+      back.textContent = '‹ Back';
+      back.title = 'Back to the previous word';
+      back.addEventListener('click', () => goBack());
+      head.append(back);
+    }
     const lemmaEl = document.createElement('span');
     lemmaEl.className = 'lemma';
     lemmaEl.textContent = displayLemma;
@@ -275,7 +303,7 @@ export function createPopover(deps: PopoverDeps) {
       chip.className = 'syn-w';
       chip.textContent = word;
       chip.title = `Look up “${word}”`;
-      chip.addEventListener('click', () => void openFor(currentAnchor, word));
+      chip.addEventListener('click', () => void navigate(word));
       section.append(chip);
     }
     return section;
@@ -286,8 +314,16 @@ export function createPopover(deps: PopoverDeps) {
     let last = 0;
     for (const m of text.matchAll(/[A-Za-z][A-Za-z'’-]*/g)) {
       const token = m[0];
+      // SIP-008 restrictive guard: only pure lowercase words of ≥3 letters
+      // can be recommended — never "A"/"O", capitalized words, acronyms,
+      // brand-like CamelCase, or apostrophe forms. (Single letters aren't
+      // in the frequency list, so the rarity predicate alone would rank
+      // them "rarer than every band".) Explicit dblclick remains ungated.
       const linkable =
-        !!deps.isLinkable && deps.isLinkable(token) && !isFormOfHeadword(headword, token);
+        /^[a-z]{3,}$/.test(token) &&
+        !!deps.isLinkable &&
+        deps.isLinkable(token) === true &&
+        !isFormOfHeadword(headword, token);
       if (!linkable) continue;
       const at = m.index ?? 0;
       if (at > last) target.append(text.slice(last, at));
@@ -296,7 +332,7 @@ export function createPopover(deps: PopoverDeps) {
       btn.className = 'def-w';
       btn.textContent = token;
       btn.title = `Look up “${token}”`;
-      btn.addEventListener('click', () => void openFor(currentAnchor, token));
+      btn.addEventListener('click', () => void navigate(token));
       target.append(btn);
       last = at + token.length;
     }
@@ -313,6 +349,13 @@ export function createPopover(deps: PopoverDeps) {
     const activeStatus = vocabEntry?.status;
     card.innerHTML = '';
 
+    currentNav = {
+      lemma: entry.lemma ?? lemma,
+      vocabKey: currentVocabKey ?? lemma,
+      entry,
+      source,
+      vocabEntry,
+    };
     card.append(headRow(entry.lemma ?? lemma, entry.phonetic));
 
     for (const sense of entry.senses.slice(0, 3)) {
@@ -372,6 +415,13 @@ export function createPopover(deps: PopoverDeps) {
 
   function renderNoDefinition(lemma: string, vocabEntry?: VocabEntry): void {
     card.innerHTML = '';
+    currentNav = {
+      lemma,
+      vocabKey: currentVocabKey ?? lemma,
+      entry: null,
+      source: 'none',
+      vocabEntry,
+    };
     card.append(headRow(lemma));
     const state = document.createElement('p');
     state.className = 'state';
@@ -432,6 +482,28 @@ export function createPopover(deps: PopoverDeps) {
     card.querySelector('.status-row')?.before(metSection(lemma, examples));
   }
 
+  /** Loads and renders one entry (used by root opens and stacked navigation). */
+  async function loadEntry(lemma: string, vocabKey: string): Promise<void> {
+    currentLemma = lemma;
+    currentVocabKey = vocabKey;
+    const seq = ++lookupSeq;
+    renderLoading(lemma);
+    position(currentAnchor);
+
+    const [result, entry] = await Promise.all([
+      deps.lookup(lemma),
+      deps.vocab.getEntry(vocabKey),
+    ]);
+    if (seq !== lookupSeq || currentLemma !== lemma) return; // superseded or closed
+
+    if (result.entry) {
+      renderEntry(lemma, result.entry, result.source, entry);
+    } else {
+      renderNoDefinition(lemma, entry);
+    }
+    void deps.vocab.bumpLookup(vocabKey).catch(() => undefined);
+  }
+
   /**
    * `lemma` is the display word (drives the dictionary lookup);
    * `vocabKey` is the canonical form all vocabulary state keys — the
@@ -444,30 +516,48 @@ export function createPopover(deps: PopoverDeps) {
     vocabKey?: string,
   ): Promise<void> {
     currentAnchor = anchor;
-    currentLemma = lemma;
-    currentVocabKey = vocabKey ?? lemma;
-    const seq = ++lookupSeq;
-    renderLoading(lemma);
-    position(anchor);
+    navStack.length = 0; // a root open starts a fresh stack (SIP-008)
+    await loadEntry(lemma, vocabKey ?? lemma);
+  }
 
-    const [result, entry] = await Promise.all([
-      deps.lookup(lemma),
-      deps.vocab.getEntry(currentVocabKey),
-    ]);
-    if (seq !== lookupSeq || currentLemma !== lemma) return; // superseded or closed
+  /** SIP-008: stacked in-popover navigation — the current entry stays underneath. */
+  async function navigate(word: string): Promise<void> {
+    if (!currentNav) return;
+    navStack.push(currentNav);
+    await loadEntry(word, word);
+  }
 
-    if (result.entry) {
-      renderEntry(lemma, result.entry, result.source, entry);
+  /** SIP-008: re-render the entry underneath — instant, no re-lookup. */
+  function goBack(): void {
+    const prev = navStack.pop();
+    if (!prev) return;
+    lookupSeq++; // cancel any pending load for a superseded navigation
+    currentLemma = prev.lemma;
+    currentVocabKey = prev.vocabKey;
+    if (prev.entry) {
+      renderEntry(prev.lemma, prev.entry, prev.source, prev.vocabEntry);
     } else {
-      renderNoDefinition(lemma, entry);
+      renderNoDefinition(prev.lemma, prev.vocabEntry);
     }
-    void deps.vocab.bumpLookup(currentVocabKey).catch(() => undefined);
+  }
+
+  /** SIP-008: dblclick selects a word natively — look it up, whatever it is. */
+  function onCardDblClick(event: Event): void {
+    if ((event.target as Element | null)?.closest?.('button')) return; // buttons aren't word lookups
+    const selection = window.getSelection()?.toString() ?? '';
+    const word = (selection.match(/[A-Za-z][A-Za-z'’-]*/) ?? [])[0];
+    if (!word) return;
+    const key = currentLemma;
+    if (key && isFormOfHeadword(key, word)) return; // same word — nothing to learn
+    void navigate(word);
   }
 
   function closePopover(): void {
     currentLemma = null;
     currentVocabKey = null;
     currentAnchor = null;
+    currentNav = null;
+    navStack.length = 0;
     lookupSeq++;
     card.style.display = 'none';
     card.innerHTML = '';
@@ -495,6 +585,7 @@ export function createPopover(deps: PopoverDeps) {
 
   document.addEventListener('click', onDocClick, true);
   document.addEventListener('keydown', onKey, true);
+  card.addEventListener('dblclick', onCardDblClick);
 
   return {
     openFor,

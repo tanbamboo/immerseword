@@ -100,3 +100,20 @@ Analysis and implementation live in [../sip_logs.md](../sip_logs.md).
 > when I lookup the word "copiously", I got "adverb, In a copious
 > manner", but I still can't comprehend the meaning. maybe should let me
 > click on the "copious" to lookup the definition of it.
+
+---
+
+## feat-2026-11-17-002 — restrictive link rules; dblclick any popover word; stacked popover with Back
+
+**Recorded:** 2026-11-17 10:38 +0800
+**Source:** user request (ZCode session)
+**Status:** implemented — PR-31 (`pr/31-link-rules-popover-stack`); see SIP-008
+
+**Raw request:**
+
+> never create links for "A" or "O", it's silly. there should be
+> restrictive rules to recommend a candidate. and user can always double
+> click a word to lookup the definition. and when click a candidate word
+> or double click any word on the popover window, the new popover window
+> should float over the original, and there should be a "back" button,
+> click it can "back" to the original one.

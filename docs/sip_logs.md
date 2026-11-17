@@ -384,3 +384,61 @@ PR merges. Append-only — never rewrite a merged proposal.
   sentinel because resolveForm keys it under lemma "even", rank 253), and
   waitForFunction's default rAF polling starves on the backgrounded tab
   behind the panel page — interval polling (500 ms) instead.
+
+---
+
+## SIP-008 — restrictive definition-link rules; popover word dblclick; stacked navigation with Back
+
+- **Requested:** 2026-11-17 (`feat-2026-11-17-002`)
+- **Motivation:** SIP-007 linked "A"/"O" inside definitions — silly. Root
+  cause: the frequency list excludes single-letter words, so a/o resolve
+  to rank 0 = "rarer than every band". The reporter wants (1) a
+  restrictive candidate rule, (2) dblclick-any-word on the popover as the
+  always-available escape hatch, (3) chained lookups to open a NEW
+  popover floating over the original with a Back button.
+- **Scope:**
+  1. Lexical guard in the popover before the rarity predicate: a
+     definition word links only if it is ≥3 chars, pure lowercase a–z.
+     This never links "A"/"O", acronyms/ALL-CAPS, brand-like CamelCase,
+     apostrophe forms, or capitalized words — restrictive by design.
+  2. `dblclick` on the popover card looks up the selected word (the
+     browser selects the word under the cursor on dblclick) — any word,
+     no guards beyond tokenization, because it is explicit user intent.
+  3. Stacked navigation: in-popover lookups (definition links, synonym
+     words, dblclick) push the current entry onto a stack and render the
+     new one in place, with a "‹ Back" head button while the stack is
+     non-empty; Back re-renders the previous entry from the stack
+     (instant, no re-lookup). Root lookups (page clicks) reset the stack.
+- **UX sketch:**
+  ```
+  ‹ Back   copious  ✕          ← deep entry, floats over…
+  adjective  large in quantity  │ …the original (observe) behind
+  ```
+- **Technical approach:** `popover.ts` gains a `NavState` stack
+  (`{lemma, vocabKey, entry, source, vocabEntry}`); `openFor` resets it,
+  in-popover navigation pushes, `back()` pops and re-renders from the
+  stored state (lookup sequence guard cancels superseded loads).
+  dblclick handler reads the native selection (empty on button dblclicks
+  → no-op). Lexical guard lives in `appendWithDefinitionLinks` before
+  `deps.isLinkable`, so every consumer inherits it.
+- **Test plan:** unit — "A"/"O"/"don't"/capitalized/CamelCase never link
+  even when the predicate accepts everything; dblclick dispatch with a
+  set selection navigates; Back appears after deep navigation, restores
+  the previous lemma without a second lookup, hides at root; synonyms
+  still navigate (now stacked). e2e — extend the SIP-007 case: after
+  tapping "existence", Back is visible and returns to "observe"; a
+  simulated dblclick over a common word in the definition opens its
+  entry stacked, Back returns.
+- **Risks / edge cases:** Back re-renders a snapshot — if the user
+  classified the deep word, the parent's status display could be stale;
+  acceptable (statuses render per word; the parent snapshot is refreshed
+  on its next open). Dblclick on buttons is ignored (no selection).
+  Escape/outside-click closes the whole stack (one popover, per ADR-0001).
+- **Docs:** PRD F2 — restrictive link rule + stacked navigation bullets.
+- **Outcome:** implemented in PR-31 (`pr/31-link-rules-popover-stack`).
+  Gates: typecheck, unit 155/155, e2e 39/39 (extended SIP-007 case:
+  tapping "existence" stacks over "observe", Back returns instantly and
+  hides at root; a simulated in-card dblclick on "determine" — rank 1888,
+  never a recommended link — opens it stacked). Root cause of the "A"/"O"
+  links recorded in the proposal: the frequency list excludes
+  single-letter words, so they rank 0 = rarer-than-every-band.
