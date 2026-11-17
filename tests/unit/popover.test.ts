@@ -332,3 +332,66 @@ describe('synonyms section (SIP-005)', () => {
     popover.close();
   });
 });
+
+describe('tappable definition words (SIP-007)', () => {
+  const COPIOUSLY: DictionaryEntry = {
+    lemma: 'copiously',
+    senses: [
+      { partOfSpeech: 'adverb', definition: 'in a copious manner', example: 'she wept copiously' },
+    ],
+  };
+
+  it('links unknown words in definitions and examples; taps chain the lookup', async () => {
+    const lookup = vi.fn(async (word: string) => ({
+      entry: word === 'copiously'
+        ? COPIOUSLY
+        : { lemma: word, senses: [{ definition: `definition of ${word}` }] } as DictionaryEntry,
+      source: 'core',
+    }));
+    const popover = createPopover({
+      lookup,
+      vocab: createVocabStore(fakeStorage()),
+      isWordForm: (lemma, token) => token.toLowerCase() === lemma,
+      isLinkable: (token) => token.toLowerCase() === 'copious',
+    });
+    await popover.openFor(null, 'copiously');
+
+    const linked = [...popover._card.querySelectorAll<HTMLButtonElement>('.def-w')];
+    expect(linked.map((b) => b.textContent)).toEqual(['copious']); // only the rare word
+    expect(popover._card.querySelector('.def')?.textContent).toBe('in a copious manner');
+
+    linked[0]?.click();
+    await vi.waitFor(() => {
+      expect(popover._card.querySelector('.lemma')?.textContent).toBe('copious');
+    });
+    expect(lookup).toHaveBeenCalledWith('copious');
+    popover.close();
+  });
+
+  it('never links forms of the headword itself', async () => {
+    const entry: DictionaryEntry = {
+      lemma: 'observe',
+      senses: [{ definition: 'to observe and observe it' }],
+    };
+    const popover = createPopover({
+      lookup: async () => ({ entry, source: 'core' }),
+      vocab: createVocabStore(fakeStorage()),
+      isWordForm: (lemma, token) => token.toLowerCase().startsWith(lemma.slice(0, 6)),
+      // only headword forms qualify by rarity… ('to'/'and'/'it' do not)
+      isLinkable: (token) => token.toLowerCase().startsWith('observ'),
+    });
+    await popover.openFor(null, 'observe');
+    // …but the headword exclusion wins: no links at all.
+    expect(popover._card.querySelectorAll('.def-w')).toHaveLength(0);
+    popover.close();
+  });
+
+  it('renders definitions verbatim without the predicate', async () => {
+    const { popover } = makePopover(); // no isLinkable dep
+    await popover.openFor(null, 'observe');
+    const def = popover._card.querySelector('.def');
+    expect(def?.textContent).toBe('discover or determine the existence of something');
+    expect(def?.querySelector('.def-w')).toBeNull();
+    popover.close();
+  });
+});

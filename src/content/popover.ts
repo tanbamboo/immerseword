@@ -15,6 +15,12 @@ export interface PopoverDeps {
   onStatusChange?: (lemma: string, status: WordStatus) => void;
   /** Resolves whether a sentence token is a form of the lemma (SIP-003 highlight). */
   isWordForm?: (lemma: string, token: string) => boolean;
+  /**
+   * SIP-007: whether a definition/example token is worth a chained lookup —
+   * the content script answers via the frequency index (rarer than the
+   * user's level, minus known/ignored vocabulary).
+   */
+  isLinkable?: (token: string) => boolean;
 }
 
 const STYLE = `
@@ -86,6 +92,14 @@ const STYLE = `
   .syn-w::after { content: ", "; color: #616e7c; }
   .syn-w:last-child::after { content: ""; }
   .syn-w:hover { text-decoration: underline; color: #4f46e5; }
+  /* SIP-007: tappable definition words — dotted like page candidate marks. */
+  .def-w {
+    display: inline; margin: 0; padding: 0;
+    border: 0; background: none; font: inherit; color: inherit;
+    cursor: pointer; text-decoration: underline dotted #b45309;
+    text-decoration-thickness: 1px; text-underline-offset: 2px;
+  }
+  .def-w:hover { text-decoration-style: solid; color: #4f46e5; }
 `;
 
 const STATUS_LABELS: Array<[WordStatus, string]> = [
@@ -267,6 +281,34 @@ export function createPopover(deps: PopoverDeps) {
     return section;
   }
 
+  /** SIP-007: appends text with tappable unknown-word tokens as buttons. */
+  function appendWithDefinitionLinks(target: HTMLElement, text: string, headword: string): void {
+    let last = 0;
+    for (const m of text.matchAll(/[A-Za-z][A-Za-z'’-]*/g)) {
+      const token = m[0];
+      const linkable =
+        !!deps.isLinkable && deps.isLinkable(token) && !isFormOfHeadword(headword, token);
+      if (!linkable) continue;
+      const at = m.index ?? 0;
+      if (at > last) target.append(text.slice(last, at));
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'def-w';
+      btn.textContent = token;
+      btn.title = `Look up “${token}”`;
+      btn.addEventListener('click', () => void openFor(currentAnchor, token));
+      target.append(btn);
+      last = at + token.length;
+    }
+    if (last < text.length) target.append(text.slice(last));
+  }
+
+  function isFormOfHeadword(headword: string, token: string): boolean {
+    return deps.isWordForm
+      ? deps.isWordForm(headword, token) === true
+      : token.toLowerCase() === headword;
+  }
+
   function renderEntry(lemma: string, entry: DictionaryEntry, source: string, vocabEntry?: VocabEntry): void {
     const activeStatus = vocabEntry?.status;
     card.innerHTML = '';
@@ -284,12 +326,14 @@ export function createPopover(deps: PopoverDeps) {
       }
       const def = document.createElement('p');
       def.className = 'def';
-      def.textContent = sense.definition;
+      appendWithDefinitionLinks(def, sense.definition, entry.lemma ?? lemma);
       wrap.append(def);
       if (sense.example) {
         const ex = document.createElement('p');
         ex.className = 'ex';
-        ex.textContent = `“${sense.example}”`;
+        ex.append('“');
+        appendWithDefinitionLinks(ex, sense.example, entry.lemma ?? lemma);
+        ex.append('”');
         wrap.append(ex);
       }
       card.append(wrap);

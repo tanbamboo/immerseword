@@ -332,3 +332,55 @@ PR merges. Append-only — never rewrite a merged proposal.
 - **Outcome:** implemented in PR-29 (`pr/29-synonym-style`). Gates:
   typecheck, unit 149/149, e2e 38/38 — the SIP-005 assertions passed
   unchanged, as expected for a stylesheet-only change.
+
+---
+
+## SIP-007 — tappable words inside definitions (chain lookups)
+
+- **Requested:** 2026-11-17 (`feat-2026-11-17-001`)
+- **Motivation:** WordNet glosses are sometimes circular for derived
+  forms — the reporter looked up "copiously" and got "in a copious
+  manner", which only helps if "copious" is itself one tap away. Word
+  chaining turns each lookup into a guided walk from unknown to known.
+- **Scope:** in the popover's sense definitions and sense examples,
+  words that are **rarer than the user's level** (the same unknown-word
+  model the tagger uses, ADR-0003) render as tappable: dotted underline,
+  hover solid; a tap re-opens the popover for that word. Words inside
+  your level, marked known/ignored, or forms of the headword itself stay
+  plain. Synonym words (SIP-006) and "Recently met" sentences unchanged.
+- **UX sketch:**
+  ```
+  copiously  /ˈkoʊpiəsli/  ✕
+  adverb  In a ·copious· manner      ← dotted = tappable
+  ```
+- **Technical approach:** new optional popover dep
+  `isLinkable?: (token) => boolean`, wired in `content/index.ts` from the
+  frequency index (`resolveForm` + `isRarerThan(level)`) minus vocab
+  known/ignored statuses; the popover itself excludes headword forms via
+  the existing `isWordForm` dep and tokenizes with the shared word regex.
+  Click reuses `openFor(currentAnchor, word)` — identical to synonym
+  chips. Pure presentation + one predicate; no data or service changes.
+- **Test plan:** unit — popover links tokens only when the predicate
+  says so (the exact "copiously → copious" repro with a stubbed
+  predicate); headword forms never link; taps trigger lookup; unlinked
+  text renders verbatim. e2e — set level 2k via sync storage (existing
+  pattern), open "observe", its definition's "existence" (rank ~2.4k)
+  must be tappable and its tap must swap the popover to that word;
+  restore the level afterwards.
+- **Risks / edge cases:** link density depends on the user's level — at
+  20k almost no definition word qualifies (calm), at 2k many do
+  (guided); rank-0 unlisted words in glosses count as rarer than every
+  band (consistent with the tagger); definitions come from our own data
+  (WordNet glosses / API), so token quality is controlled; multiword
+  phrases link per-word, acceptable for v1.
+- **Docs:** PRD F2 bullet; ADR-0003 amendment (the rarity model now also
+  drives in-popover linkable words).
+- **Outcome:** implemented in PR-30 (`pr/30-definition-links`). Gates:
+  typecheck, unit 152/152, e2e 39/39 (new case: at level 2k observe's
+  gloss links discover/existence; tapping existence swaps the popover —
+  asserted in real Chrome). Two e2e lessons folded into the spec: the
+  level-change retag races the click (barrier: 2k-only stable-lemma words
+  quiet/moment must be wrapped first — evening/even is NOT a valid
+  sentinel because resolveForm keys it under lemma "even", rank 253), and
+  waitForFunction's default rAF polling starves on the backgrounded tab
+  behind the panel page — interval polling (500 ms) instead.

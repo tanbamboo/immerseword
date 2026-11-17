@@ -133,6 +133,117 @@ export const tests = [
     },
   },
   {
+    name: 'rare words inside definitions are tappable and chain the lookup (SIP-007)',
+    async run() {
+      await withHarness(async ({ browser, baseUrl }) => {
+        const page = await openArticle(browser, baseUrl);
+        const extensionId = (await import('./harness.mjs')).getExtensionId(browser);
+        const panel = await (await import('./harness.mjs')).openExtensionPage(
+          browser,
+          extensionId,
+          'sidepanel/sidepanel.html',
+        );
+        // Level 2k makes definition words beyond rank 2000 tappable:
+        // observe's gloss links "discover" (2969) and "existence" (4349).
+        await panel.evaluate(
+          () =>
+            new Promise((resolve) => {
+              chrome.storage.sync.get(['iw:settings'], (found) => {
+                chrome.storage.sync.set(
+                  { 'iw:settings': { ...found['iw:settings'], level: '2k' } },
+                  () => resolve(),
+                );
+              });
+            }),
+        );
+        try {
+          // The level change re-tags the page (untag → batched re-wrap).
+          // Barrier: words that only tag at 2k with stable lemmas — quiet
+          // (4179) and moment (2232) are untagged at 5k — plus observe.
+          // All three present ⇒ the retag finished (clicking mid-rescan
+          // races the span unwrap). Polled manually: the condition checks
+          // the post-change DOM state, which puppeteer's rAF-polled
+          // waitForFunction can miss on a background tab.
+          const deadline = Date.now() + 20_000;
+          for (;;) {
+            const settled = await page.evaluate(
+              () =>
+                !!document.querySelector('span.iw-word[data-lemma="quiet"]') &&
+                !!document.querySelector('span.iw-word[data-lemma="moment"]') &&
+                !!document.querySelector('span.iw-word[data-lemma="observe"]'),
+            );
+            if (settled) break;
+            if (Date.now() > deadline) {
+              throw new Error('level-2k retag did not settle (quiet/moment/observe missing)');
+            }
+            await new Promise((r) => setTimeout(r, 250));
+          }
+          await clickWord(page, 'observe');
+          // NB: interval polling — this spec's article tab stays backgrounded
+          // behind the panel page, and waitForFunction's default rAF polling
+          // can starve on backgrounded headless tabs.
+          await page.waitForFunction(
+            () =>
+              document
+                .getElementById('iw-popover-host')
+                ?.shadowRoot?.querySelector('.card .lemma')?.textContent === 'observe',
+            { timeout: 15_000, polling: 500 },
+          );
+          console.log('[SIP-007] clicked observe');
+          await page.waitForFunction(
+            () =>
+              document
+                .getElementById('iw-popover-host')
+                ?.shadowRoot?.querySelector('.card .lemma')?.textContent === 'observe',
+            { timeout: 15_000 },
+          );
+          const linked = await page.evaluate(() =>
+            [
+              ...document
+                .getElementById('iw-popover-host')
+                .shadowRoot.querySelectorAll('.def-w'),
+            ].map((b) => b.textContent),
+          );
+          assert.ok(
+            linked.includes('existence') && linked.includes('discover'),
+            `expected discover/existence links at level 2k, got: ${JSON.stringify(linked)}`,
+          );
+
+          // Chained lookup: tap "existence" → its own entry opens.
+          await page.evaluate(() => {
+            [
+              ...document.getElementById('iw-popover-host').shadowRoot.querySelectorAll('.def-w'),
+            ]
+              .find((b) => b.textContent === 'existence')
+              .click();
+          });
+          await page.waitForFunction(
+            () =>
+              document
+                .getElementById('iw-popover-host')
+                ?.shadowRoot?.querySelector('.card .lemma')?.textContent === 'existence',
+            { timeout: 15_000, polling: 500 },
+          );
+        } finally {
+          // Restore the stock level for later specs.
+          await panel.evaluate(
+            () =>
+              new Promise((resolve) => {
+                chrome.storage.sync.get(['iw:settings'], (found) => {
+                  chrome.storage.sync.set(
+                    { 'iw:settings': { ...found['iw:settings'], level: '5k' } },
+                    () => resolve(),
+                  );
+                });
+              }),
+          );
+          await panel.close();
+          await page.close();
+        }
+      });
+    },
+  },
+  {
     name: 'double-clicking an untagged word opens the popover',
     async run() {
       await withHarness(async ({ browser, baseUrl }) => {

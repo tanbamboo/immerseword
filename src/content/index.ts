@@ -129,6 +129,13 @@ async function init(): Promise<void> {
     lookup: lookupDefinition,
     vocab,
     isWordForm: (lemma, token) => lemmatizer.lemma(token.toLowerCase()) === lemma,
+    // SIP-007: words rarer than the level (minus known/ignored) chain lookups.
+    isLinkable: (token) => {
+      const key = index.resolveForm(token);
+      const status = statusMap.get(key);
+      if (status === 'known' || status === 'ignored') return false;
+      return index.isRarerThan(key, currentSettings.level);
+    },
     onStatusChange: (lemma, status) => {
       statusMap.set(lemma, status);
       onVocabClassified(lemma, status);
