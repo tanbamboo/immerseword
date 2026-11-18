@@ -62,8 +62,14 @@ pedagogically sound.
 
 - On page load (and on DOM changes), the content script walks text nodes, tokenizes words,
   lemmatizes them, and classifies each against:
-  1. the user's **frequency level** (words rarer than the band are *potentially unknown*), and
-  2. the **personal vocabulary list** (explicit statuses override frequency).
+  1. the **personal vocabulary list** (explicit statuses override everything), and
+  2. the **candidate rule** (SIP-010): in the default *quiet* density, only words
+     **absent from the 20k corpus** ("really complex") are candidates; the *full*
+     density restores the original rarer-than-level rule; during the 3-pass Study
+     pass, candidates always use the full level band. Rationale: tagging is a
+     recommendation, not the only entry (dblclick reaches any word), so marks are
+     spent only where they earn attention — over-tagging distracts from fluent
+     reading.
 - Rendering (defaults, user-configurable style/ intensity):
   | Status | Meaning | Visual (Pass 2 default) |
   |---|---|---|
@@ -125,7 +131,7 @@ shows progress and triggers transitions; the side panel mirrors the same control
 | | Pass 1 — Gist | Pass 2 — Study | Pass 3 — Fluency |
 |---|---|---|---|
 | Goal | Overall meaning; tolerate ambiguity | Vocabulary acquisition | Flow, consolidation, enjoyment |
-| Tagging | Hidden (or faint dots for *unknown*, configurable) | Full tagging (F1 defaults) | Only `unknown`/`learning` faintly marked |
+| Tagging | Quiet rule (SIP-010) | **Elevated to the full level band** — all rare words marked | Quiet rule again |
 | Lookups | Allowed (tap a word that blocks understanding → flagged `unknown`) | Central: popover + classification | Discouraged but available |
 | UI hints | "Read for the gist. Don't stop for words." | "Tap words you don't know. Classify honestly." | "Reread at full speed. Enjoy it." |
 | Exit | "Start Pass 2 →" | "Start Pass 3 →" (nags if zero lookups: gentle) | "Finish" → session summary |
@@ -164,6 +170,8 @@ shows progress and triggers transitions; the side panel mirrors the same control
 Options page + side panel quick settings:
 
 - Level band: 2k / 5k / 10k / 20k (default **5k**)
+- Tag density (SIP-010): **Quiet** (default — learning/unknown + unlisted words only) /
+  Full (legacy rarer-than-level marking); the Study pass elevates regardless
 - Tagging: on/off; highlight intensity (subtle/normal/vivid); show candidates on/off
 - Popover width: 320 / 480 / 640 px (default **480**)
 - Pass 1 behavior: hide tags entirely vs. faint marks

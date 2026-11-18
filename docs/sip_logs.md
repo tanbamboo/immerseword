@@ -460,3 +460,62 @@ PR merges. Append-only — never rewrite a merged proposal.
 - **Outcome:** implemented in PR-32 (`pr/32-lemma-size`). Gates:
   typecheck, unit 155/155, e2e 39/39 — unchanged, as expected for a
   one-value stylesheet change.
+
+---
+
+## SIP-010 — quiet tagging: steady-state pages mark only what truly needs attention
+
+- **Requested:** 2026-11-18 (`feat-2026-11-18-002`); direction confirmed
+  with the reporter (quiet default + Pass-2 elevation + legacy setting).
+- **Motivation:** days of real use showed ADR-0003's rule — candidate =
+  rarer-than-band — over-tags: band-edge words are usually guessable,
+  the user's professional jargon ranks rare in a general corpus, and
+  dozens of dots per page desensitize and exhaust classification. Since
+  SIP-008, tagging is a recommendation, not the only entry (dblclick
+  reaches any word), so marks should be spent only where they earn
+  attention.
+- **Scope:**
+  1. New setting `tagDensity: 'quiet' | 'full'` (default **quiet**,
+    legacy behavior available via 'full').
+  2. Quiet candidate rule: tag `learning`/`unknown` statuses (unchanged,
+    always) plus **rank-0 words only** (absent from the 20k list — the
+    "really complex" tier). Band-edge words are no longer tagged in
+    steady state.
+  3. **Pass 2 elevation**: while a 3-pass session is in the Study pass,
+    candidates use the user's full level band (study time is exactly
+    when marks help); Passes 1/3 and done stay quiet.
+  4. The level setting keeps its non-page roles: popover definition
+    links (SIP-007), coverage stats, side-panel analysis.
+- **UX sketch:**
+  - regular browsing (quiet): `petrichor`·tagged, `gossamer`·untagged
+    (both rare; only the beyond-list one marks), Learning words blue.
+  - Pass 2: same page, full band marks return for the study pass.
+- **Technical approach:** `tagger.classify` computes the effective
+  candidate rule from `settings.tagDensity` plus a `studyMode` flag set
+  by the content script when the session pass is 2; retag on density
+  changes and on study-mode transitions (existing untag+scan path);
+  options page + side-panel quick settings expose the choice.
+- **Test plan:** unit — quiet/full/study-mode matrix against the real
+  fixture ranks (petrichor rank 0 tagged; gossamer/observe untagged in
+  quiet; full restores band behavior; statuses override in all modes);
+  defaults updated. e2e — existing specs migrated to declare the
+  density they assume (full for popover/reader flows that click tagged
+  band words), plus a dedicated quiet-mode spec asserting the new
+  steady state and dblclick reachability.
+- **Risks / edge cases:** existing users' pages get dramatically quieter
+  after update (intended, but noticeable — release-note worthy); Pass-2
+  elevation makes sessions tag MORE than steady state (by design);
+  coverage stats keep using the band so "within level" numbers don't
+  change meaning; import/export gains the new field (dataio whitelist
+  extended).
+- **Docs:** PRD F1 (candidate rule), F3 (pass table), F6 (setting);
+  ADR-0003 amendment.
+- **Outcome:** implemented in PR-33 (`pr/33-quiet-tagging`). Gates:
+  typecheck, unit 157/157, e2e 40/40. New default verified end-to-end:
+  quiet pages tag only the six beyond-corpus fixture words (faint/observe/
+  reveal stay calm), the Study pass elevates observe into view, Pass 3
+  quiets again; popover/reader/passes specs migrated to declare the full
+  density they assume via a `setSyncSettings` harness helper (set before
+  load — no retag race). One mid-spec footgun found by the run: hand-built
+  settings payloads must now include tagDensity or the merge-over-defaults
+  silently flips the page to quiet (SIP-004 spec fixed).

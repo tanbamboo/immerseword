@@ -107,6 +107,7 @@ export function parseImportPayload(raw: string): ImportResult {
     const s = data.settings as Partial<IwSettings>;
     settings = {};
     if (s.level && ['2k', '5k', '10k', '20k'].includes(s.level)) settings.level = s.level;
+    if (s.tagDensity === 'quiet' || s.tagDensity === 'full') settings.tagDensity = s.tagDensity;
     if (typeof s.taggingEnabled === 'boolean') settings.taggingEnabled = s.taggingEnabled;
     if (typeof s.pass1ShowMarks === 'boolean') settings.pass1ShowMarks = s.pass1ShowMarks;
     if (typeof s.onlineFallback === 'boolean') settings.onlineFallback = s.onlineFallback;

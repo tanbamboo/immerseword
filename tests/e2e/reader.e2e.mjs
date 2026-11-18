@@ -6,7 +6,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { withHarness, watchPage } from './harness.mjs';
+import { withHarness, watchPage, setSyncSettings } from './harness.mjs';
 
 function readerShadow(page) {
   return page.evaluate(() => document.getElementById('iw-reader')?.shadowRoot ?? null);
@@ -17,6 +17,9 @@ export const tests = [
     name: 'launcher opens the reader with the extracted, tagged article',
     async run() {
       await withHarness(async ({ browser, baseUrl }) => {
+        // SIP-010: the reader flows assert band-level tagged words
+        // ("observe", rank 7565) — run under full density.
+        await setSyncSettings(browser, { tagDensity: 'full' });
         const page = await browser.newPage();
         const watcher = watchPage(page, 'fixture');
         await page.goto(`${baseUrl}/article.html`, { waitUntil: 'load' });
@@ -75,6 +78,7 @@ export const tests = [
     name: 'theme and typography controls restyle the reader live',
     async run() {
       await withHarness(async ({ browser, baseUrl }) => {
+        await setSyncSettings(browser, { tagDensity: 'full' }); // SIP-010
         const page = await browser.newPage();
         await page.goto(`${baseUrl}/article.html`, { waitUntil: 'load' });
         await page.waitForSelector('#iw-reader-launch', { timeout: 10_000 });
@@ -133,6 +137,7 @@ export const tests = [
     name: 'exit restores the page exactly; popover works inside the reader',
     async run() {
       await withHarness(async ({ browser, baseUrl }) => {
+        await setSyncSettings(browser, { tagDensity: 'full' }); // SIP-010
         const page = await browser.newPage();
         await page.goto(`${baseUrl}/article.html`, { waitUntil: 'load' });
         await page.waitForFunction(() => document.querySelectorAll('span.iw-word').length >= 7, {

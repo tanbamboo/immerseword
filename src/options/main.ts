@@ -40,6 +40,7 @@ async function saveReaderPrefs(prefs: ReaderPrefs): Promise<void> {
 async function refresh(): Promise<void> {
   const settings = await getSettings(sync);
   (el('#opt-level') as HTMLSelectElement).value = settings.level;
+  (el('#opt-tag-density') as HTMLSelectElement).value = settings.tagDensity;
   (el('#opt-tagging') as HTMLInputElement).checked = settings.taggingEnabled;
   (el('#opt-pass1-marks') as HTMLInputElement).checked = settings.pass1ShowMarks;
   (el('#opt-online') as HTMLInputElement).checked = settings.onlineFallback;
@@ -57,6 +58,12 @@ function bindSettings(): void {
   el('#opt-level').addEventListener('change', async (event) => {
     await setSettings(sync, { level: (event.target as HTMLSelectElement).value as LevelBand });
     status('Level saved — open pages retag automatically.');
+  });
+  el('#opt-tag-density').addEventListener('change', async (event) => {
+    await setSettings(sync, {
+      tagDensity: (event.target as HTMLSelectElement).value as IwSettings['tagDensity'],
+    });
+    status('Tag density saved — open pages retag automatically.');
   });
   el('#opt-tag-style').addEventListener('change', async (event) => {
     await setSettings(sync, { tagStyle: (event.target as HTMLSelectElement).value as TagStyle });

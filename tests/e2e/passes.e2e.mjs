@@ -9,9 +9,13 @@
  */
 
 import assert from 'node:assert/strict';
-import { withHarness, openExtensionPage, getExtensionId, watchPage } from './harness.mjs';
+import { withHarness, openExtensionPage, getExtensionId, watchPage, setSyncSettings } from './harness.mjs';
 
 async function openArticle(browser, baseUrl) {
+  // SIP-010: this spec asserts band-level decorations ("observe", rank
+  // 7565) across all passes — run under full density so the tag set is
+  // stable through the study-mode flips.
+  await setSyncSettings(browser, { tagDensity: 'full' });
   const page = await browser.newPage();
   const watcher = watchPage(page, 'fixture');
   await page.goto(`${baseUrl}/article.html`, { waitUntil: 'load' });
@@ -244,6 +248,76 @@ export const tests = [
         watcher.assertClean();
         await panel.close();
         await page.close();
+      });
+    },
+  },
+  {
+    name: 'quiet density: only the Study pass elevates band words (SIP-010)',
+    async run() {
+      await withHarness(async ({ browser, baseUrl }) => {
+        // Product defaults (quiet) — set AFTER the full-density specs above.
+        await setSyncSettings(browser, { tagDensity: 'quiet' });
+        const page = await browser.newPage();
+        const watcher = watchPage(page, 'fixture');
+        await page.goto(`${baseUrl}/article.html`, { waitUntil: 'load' });
+        await page.waitForFunction(
+          () => document.querySelectorAll('span.iw-word[data-iw-status="candidate"]').length >= 6,
+          { timeout: 10_000 },
+        );
+        await page.bringToFront();
+        const panel = await openPanel(browser, page);
+
+        // Steady state: observe (rank 7565) stays calm in quiet mode.
+        assert.equal(
+          await page.evaluate(
+            () => document.querySelector('span.iw-word[data-lemma="observe"]') !== null,
+          ),
+          false,
+          'band word untagged in quiet mode',
+        );
+
+        // Pass 1 (quiet rule): still calm.
+        await startSession(panel);
+        await page.waitForFunction(() => document.documentElement.dataset.iwPass === '1', {
+          timeout: 5_000,
+        });
+        assert.equal(
+          await page.evaluate(
+            () => document.querySelector('span.iw-word[data-lemma="observe"]') !== null,
+          ),
+          false,
+          'Pass 1 keeps the quiet rule',
+        );
+
+        // Pass 2 (Study): candidates elevate to the full band.
+        await clickPillNext(page);
+        await page.waitForFunction(
+          () =>
+            document.documentElement.dataset.iwPass === '2' &&
+            document.querySelector('span.iw-word[data-lemma="observe"]') !== null,
+          { timeout: 15_000 },
+        );
+
+        // Pass 3: quiet again — observe unwraps.
+        await clickPillNext(page);
+        await page.waitForFunction(
+          () =>
+            document.documentElement.dataset.iwPass === '3' &&
+            document.querySelector('span.iw-word[data-lemma="observe"]') === null,
+          { timeout: 15_000 },
+        );
+        // Beyond-corpus words stay tagged throughout (the pass-3 retag
+        // re-wraps them in batches — wait for one rather than asserting
+        // synchronously).
+        await page.waitForFunction(
+          () => document.querySelector('span.iw-word[data-lemma="serendipity"]') !== null,
+          { timeout: 10_000, polling: 500 },
+        );
+
+        watcher.assertClean();
+        await panel.close();
+        await page.close();
+        await setSyncSettings(browser, { tagDensity: 'quiet' });
       });
     },
   },

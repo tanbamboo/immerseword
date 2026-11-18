@@ -102,6 +102,13 @@ export interface DictionarySense {
 export interface IwSettings {
   /** Frequency level band. Default '5k'. */
   level: LevelBand;
+  /**
+   * Candidate tagging density (SIP-010): 'quiet' marks only personal
+   * learning/unknown words plus unlisted (beyond-20k) words; 'full' is the
+   * legacy rarer-than-level rule. The Study pass (3-pass session pass 2)
+   * always elevates to the full band. Default 'quiet'.
+   */
+  tagDensity: 'quiet' | 'full';
   /** Master switch for page tagging. */
   taggingEnabled: boolean;
   /** Pass 1 shows faint marks for unknown/learning instead of hiding all tags. */
@@ -116,6 +123,7 @@ export interface IwSettings {
 
 export const DEFAULT_SETTINGS: IwSettings = {
   level: '5k',
+  tagDensity: 'quiet',
   taggingEnabled: true,
   pass1ShowMarks: false,
   onlineFallback: true,

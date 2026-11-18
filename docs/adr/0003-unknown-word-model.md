@@ -82,3 +82,23 @@ that word (SIP-007). This addresses circular WordNet glosses for derived
 forms ("copiously — in a copious manner"): the unknown word inside a
 definition is one tap away, using exactly the same unknown-word model that
 tags pages, so link density automatically follows the learner's level.
+
+**2026-11-18 (PR-33, feat-2026-11-18-002 / SIP-010) — the candidate rule becomes two-tier.**
+Days of real use showed layer 1 (rarer-than-band ⇒ candidate) over-tags: band-edge
+words are usually guessable in context, the user's professional vocabulary ranks rare
+in a general corpus, and dozens of marks per page desensitize and exhaust
+classification. Since dblclick reaches any word (SIP-008), tagging is a recommendation,
+not the only entry — so marks are now spent conservatively:
+
+- **Quiet (default)**: candidates are only words **absent from the 20k corpus**
+  (rank 0 — the "really complex" tier), plus the personal statuses (learning/unknown
+  always shown, known/ignored never — unchanged).
+- **Full** (legacy): the original rarer-than-level rule, opt-in via the
+  `tagDensity` setting.
+- **Study-pass elevation**: while a 3-pass session is in Pass 2, candidates use the
+  user's full level band — study time is when marks help; Passes 1/3 and non-session
+  reading stay quiet.
+
+The level setting keeps its non-page roles: popover definition-links (SIP-007),
+coverage stats, and side-panel analysis all still use the band. Untagged words are
+one dblclick away.

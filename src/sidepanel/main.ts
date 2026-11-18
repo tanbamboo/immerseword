@@ -170,6 +170,7 @@ async function refreshSettings(): Promise<void> {
   const settings = await getSettings(chrome.storage.sync as SyncStorageLike);
   lastSettings = settings;
   (el('#iw-level') as HTMLSelectElement).value = settings.level;
+  (el('#iw-density') as HTMLSelectElement).value = settings.tagDensity;
   (el('#iw-tagging') as HTMLInputElement).checked = settings.taggingEnabled;
 }
 
@@ -178,6 +179,11 @@ function bindSettings(): void {
     const level = (event.target as HTMLSelectElement).value as LevelBand;
     await setSettings(chrome.storage.sync as SyncStorageLike, { level });
     // The content script retags on level change; give it a beat, then refresh.
+    setTimeout(() => void refreshPageData(), 800);
+  });
+  el('#iw-density').addEventListener('change', async (event) => {
+    const tagDensity = (event.target as HTMLSelectElement).value as IwSettings['tagDensity'];
+    await setSettings(chrome.storage.sync as SyncStorageLike, { tagDensity });
     setTimeout(() => void refreshPageData(), 800);
   });
   el('#iw-tagging').addEventListener('change', async (event) => {

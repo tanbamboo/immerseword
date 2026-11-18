@@ -118,6 +118,8 @@ export interface TaggerOptions {
 export function createTagger(options: TaggerOptions) {
   const { batchSize = 20 } = options;
   let settings = options.settings;
+  /** SIP-010: true while a 3-pass session is in the Study pass (pass 2). */
+  let studyMode = false;
   let vocab = options.vocab;
   /**
    * Scan invalidation is PER ROOT: a rescan of the page body must not abort
@@ -148,7 +150,14 @@ export function createTagger(options: TaggerOptions) {
     const status = vocab?.statusOf(lemma);
     if (status === 'known' || status === 'ignored') return null;
     if (status === 'learning' || status === 'unknown') return { lemma, status };
-    if (!options.frequency.isRarerThan(text, settings.level)) return null; // within band → common
+    // Candidate rule (SIP-010): quiet steady state marks only the
+    // beyond-list tier (rank 0 — words absent from the 20k corpus);
+    // 'full' density or the Study pass (3-pass session, pass 2) uses the
+    // user's level band. Untagged words stay reachable via dblclick.
+    const fullBand = settings.tagDensity === 'full' || studyMode;
+    if (fullBand ? !options.frequency.isRarerThan(text, settings.level) : options.frequency.rankOf(text) !== 0) {
+      return null; // within the effective rule → not worth the reader's attention
+    }
     return { lemma, status: 'candidate' };
   }
 
@@ -292,6 +301,15 @@ export function createTagger(options: TaggerOptions) {
     settings = next;
   }
 
+  /**
+   * SIP-010: the Study pass (3-pass session pass 2) elevates candidates to
+   * the full level band regardless of tagDensity. Flipping this does not
+   * retag by itself — the caller drives untag + scan.
+   */
+  function setStudyMode(on: boolean): void {
+    studyMode = on;
+  }
+
   function setVocab(next: VocabLike): void {
     vocab = next;
   }
@@ -305,5 +323,5 @@ export function createTagger(options: TaggerOptions) {
       });
   }
 
-  return { scan, rescan, untag, applySettings, setVocab, refreshStatus, classify };
+  return { scan, rescan, untag, applySettings, setStudyMode, setVocab, refreshStatus, classify };
 }
