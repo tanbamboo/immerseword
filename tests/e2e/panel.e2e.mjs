@@ -11,7 +11,7 @@ import { withHarness, openExtensionPage, getExtensionId, watchPage } from './har
 async function openPair(browser, baseUrl) {
   const page = await browser.newPage();
   await page.goto(`${baseUrl}/article.html`, { waitUntil: 'load' });
-  await page.waitForFunction(() => document.querySelectorAll('span.iw-word').length >= 7, {
+  await page.waitForFunction(() => document.querySelectorAll('span.iw-word').length >= 6, {
     timeout: 10_000,
   });
   const extensionId = getExtensionId(browser);
@@ -35,7 +35,7 @@ export const tests = [
         const watcher = watchPage(panel, 'panel');
 
         await panel.waitForFunction(
-          () => Number(document.querySelector('#st-candidates').textContent) >= 7,
+          () => Number(document.querySelector('#st-candidates').textContent) >= 6,
           { timeout: 10_000 },
         );
         const stats = await panel.evaluate(() => ({
@@ -45,7 +45,7 @@ export const tests = [
           coverage: document.querySelector('#coverage-label').textContent,
         }));
         assert.ok(stats.tokens > 60, `expected a real word count, got ${stats.tokens}`);
-        assert.ok(stats.candidates >= 7);
+        assert.ok(stats.candidates >= 6, 'quiet default: the six beyond-corpus words (SIP-010)');
         assert.equal(stats.unknown, 0, 'fresh page has no unknown words yet');
         assert.match(stats.coverage, /^\d+% comfortable$/);
         assert.ok(stats.coverage !== '100% comfortable', 'rare words exist, coverage < 100%');
@@ -102,7 +102,7 @@ export const tests = [
 
         // At 5k there are ≥7 candidates (incl. observe 7565, reveal 7098)…
         await panel.waitForFunction(
-          () => Number(document.querySelector('#st-candidates').textContent) >= 7,
+          () => Number(document.querySelector('#st-candidates').textContent) >= 6,
           { timeout: 10_000 },
         );
 

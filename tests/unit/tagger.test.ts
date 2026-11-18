@@ -103,21 +103,58 @@ describe('tagger — wrapping', () => {
     expect(spans[0]!.textContent).toBe('serendipity');
   });
 
-  it('respects the level band (2k/5k mark mid-frequency words, 20k does not)', async () => {
+  it('respects the level band under full density (2k/5k mark mid-frequency words, 20k does not)', async () => {
     const sentence = '<p>She kept studying every evening to observe the birds.</p>';
 
     // studying(6255) and observe(7565) are rare beyond 2k and 5k…
     for (const band of ['2k', '5k'] as const) {
-      const tagger = makeTagger({ settings: { level: band } });
+      const tagger = makeTagger({ settings: { level: band, tagDensity: 'full' } });
       const root = article(sentence);
       expect(await tagger.scan(root)).toBe(2);
       expect(lemmasIn(root).sort()).toEqual(['observe', 'studying']);
     }
 
     // …but comfortably inside the 20k band.
-    const at20k = makeTagger({ settings: { level: '20k' } });
+    const at20k = makeTagger({ settings: { level: '20k', tagDensity: 'full' } });
     const root20k = article(sentence);
     expect(await at20k.scan(root20k)).toBe(0);
+  });
+
+  it('quiet density tags only unlisted words; statuses still override (SIP-010)', async () => {
+    // Default settings are quiet: serendipity (unlisted) tags, while
+    // observe (7565 — beyond the 5k band but IN the corpus) does not.
+    const sentence = '<p>She kept studying every evening to observe serendipity.</p>';
+    const tagger = makeTagger(); // level 5k, tagDensity quiet
+    const root = article(sentence);
+    expect(await tagger.scan(root)).toBe(1);
+    expect(lemmasIn(root)).toEqual(['serendipity']);
+
+    // Personal statuses override the quiet rule exactly as they override
+    // the band: learning always shows, known never does.
+    const learning = makeTagger({
+      vocab: { statusOf: (lemma) => (lemma === 'observe' ? 'learning' : undefined) },
+    });
+    const rootLearning = article(sentence);
+    expect(await learning.scan(rootLearning)).toBe(2);
+    expect(lemmasIn(rootLearning).sort()).toEqual(['observe', 'serendipity']);
+  });
+
+  it('the Study pass elevates quiet density to the full band (SIP-010)', async () => {
+    const sentence = '<p>She kept studying every evening to observe serendipity.</p>';
+    const tagger = makeTagger(); // quiet, level 5k
+    tagger.setStudyMode(true);
+    const root = article(sentence);
+    // Full band in the Study pass: studying(6255), observe(7565), serendipity(0).
+    expect(await tagger.scan(root)).toBe(3);
+    expect(lemmasIn(root).sort()).toEqual(['observe', 'serendipity', 'studying']);
+
+    // Leaving the Study pass returns to the quiet rule.
+    const back = makeTagger();
+    back.setStudyMode(true);
+    back.setStudyMode(false);
+    const rootBack = article(sentence);
+    expect(await back.scan(rootBack)).toBe(1);
+    expect(lemmasIn(rootBack)).toEqual(['serendipity']);
   });
 
   it('tags all occurrences and preserves the surrounding text exactly', async () => {

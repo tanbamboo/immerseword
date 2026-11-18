@@ -6,9 +6,12 @@
  */
 
 import assert from 'node:assert/strict';
-import { withHarness, watchPage } from './harness.mjs';
+import { withHarness, watchPage, setSyncSettings } from './harness.mjs';
 
 async function openArticle(browser, baseUrl) {
+  // SIP-010: these flows click band-level tagged words ("observe", rank
+  // 7565) — declare full density before load so the initial tag uses it.
+  await setSyncSettings(browser, { tagDensity: 'full' });
   const page = await browser.newPage();
   await page.goto(`${baseUrl}/article.html`, { waitUntil: 'load' });
   await page.waitForFunction(() => document.querySelectorAll('span.iw-word').length >= 7, {
@@ -764,7 +767,7 @@ export const tests = [
         await panel.evaluate(() => {
           chrome.storage.sync.set({
             'iw:settings': {
-              level: '5k', taggingEnabled: true, pass1ShowMarks: false,
+              level: '5k', tagDensity: 'full', taggingEnabled: true, pass1ShowMarks: false,
               onlineFallback: true, tagStyle: 'underline', popoverWidth: 640,
             },
           });

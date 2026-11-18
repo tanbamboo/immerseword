@@ -125,6 +125,32 @@ export async function openExtensionPage(browser, extensionId, path) {
 }
 
 /**
+ * Patches chrome.storage.sync settings from an extension page, merging over
+ * the stored object (SIP-010: specs declare the tagDensity they assume —
+ * the product default is 'quiet', but flows that click band-level tagged
+ * words need 'full'). Call BEFORE opening the article page so the initial
+ * tag run uses the values (no retag race).
+ */
+export async function setSyncSettings(browser, patch) {
+  const extensionId = getExtensionId(browser);
+  const panel = await openExtensionPage(browser, extensionId, 'sidepanel/sidepanel.html');
+  try {
+    await panel.evaluate((p) => {
+      return new Promise((resolve) => {
+        chrome.storage.sync.get(['iw:settings'], (found) => {
+          chrome.storage.sync.set(
+            { 'iw:settings': { ...found['iw:settings'], ...p } },
+            () => resolve(),
+          );
+        });
+      });
+    }, patch);
+  } finally {
+    await panel.close();
+  }
+}
+
+/**
  * Collects console errors and page errors from a page. Call `assertClean()`
  * before the test ends; `ignore` filters page-origin errors (fixtures are
  * trusted, extension-origin errors always fail).

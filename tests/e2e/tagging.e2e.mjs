@@ -19,14 +19,14 @@ async function waitFor(page, fn, timeout = 10_000) {
 
 export const tests = [
   {
-    name: 'rare words are wrapped as candidates; common words stay untouched',
+    name: 'quiet default: beyond-corpus words tag, band words stay calm (SIP-010)',
     async run() {
       await withHarness(async ({ browser, baseUrl }) => {
         const page = await browser.newPage();
         const watcher = watchPage(page, 'fixture');
         await page.goto(`${baseUrl}/article.html`, { waitUntil: 'load' });
 
-        await waitFor(page, () => document.querySelectorAll('span.iw-word').length >= 7);
+        await waitFor(page, () => document.querySelectorAll('span.iw-word').length >= 6);
 
         const state = await page.evaluate(() => {
           const spans = [...document.querySelectorAll('span.iw-word')];
@@ -37,23 +37,25 @@ export const tests = [
           };
         });
 
-        // Every rare word in #para-rare is tagged as a candidate…
+        // Every beyond-corpus word in #para-rare is tagged as a candidate…
         for (const word of [
           'serendipity',
           'petrichor',
           'ephemeral',
           'gossamer',
           'tintinnabulation',
-          'faint',
           'dissolve',
         ]) {
           assert.ok(state.lemmas.includes(word), `${word} should be tagged`);
         }
         assert.deepEqual(state.statuses, ['candidate']);
 
-        // …mid-band rare-at-5k words are candidates too…
-        for (const word of ['observe', 'reveal']) {
-          assert.ok(state.lemmas.includes(word), `${word} should be tagged at the 5k level`);
+        // …while IN-corpus band words stay calm in quiet mode (SIP-010):
+        // faint (15109), observe (7565) and reveal (7098) are rare at the
+        // 5k level, but marking them would distract — dblclick still
+        // reaches them.
+        for (const word of ['faint', 'observe', 'reveal']) {
+          assert.ok(!state.lemmas.includes(word), `${word} must stay untagged in quiet mode`);
         }
 
         // …while lemma-known inflections are NOT tagged (lemma-first ranking).
@@ -85,7 +87,7 @@ export const tests = [
         const page = await browser.newPage();
         const watcher = watchPage(page, 'fixture');
         await page.goto(`${baseUrl}/article.html`, { waitUntil: 'load' });
-        await waitFor(page, () => document.querySelectorAll('span.iw-word').length >= 7);
+        await waitFor(page, () => document.querySelectorAll('span.iw-word').length >= 6);
 
         // The user's sentence, plus a sentinel rare word proving the rescan
         // reached this node before we assert absences.
@@ -122,7 +124,7 @@ export const tests = [
         const page = await browser.newPage();
         const watcher = watchPage(page, 'fixture');
         await page.goto(`${baseUrl}/article.html`, { waitUntil: 'load' });
-        await waitFor(page, () => document.querySelectorAll('span.iw-word').length >= 7);
+        await waitFor(page, () => document.querySelectorAll('span.iw-word').length >= 6);
 
         await page.evaluate(() => {
           const p = document.createElement('p');
@@ -159,7 +161,7 @@ export const tests = [
         const page = await browser.newPage();
         const watcher = watchPage(page, 'fixture');
         await page.goto(`${baseUrl}/article.html`, { waitUntil: 'load' });
-        await waitFor(page, () => document.querySelectorAll('span.iw-word').length >= 7);
+        await waitFor(page, () => document.querySelectorAll('span.iw-word').length >= 6);
 
         await page.evaluate(() => {
           const p = document.createElement('p');
@@ -197,7 +199,7 @@ export const tests = [
       await withHarness(async ({ browser, baseUrl }) => {
         const page = await browser.newPage();
         await page.goto(`${baseUrl}/article.html`, { waitUntil: 'load' });
-        await waitFor(page, () => document.querySelectorAll('span.iw-word').length >= 7);
+        await waitFor(page, () => document.querySelectorAll('span.iw-word').length >= 6);
         // chrome.storage lives in the isolated world — write it from an
         // extension page (side panel), exactly like a real settings change.
         const extensionId = getExtensionId(browser);
@@ -253,7 +255,7 @@ export const tests = [
       await withHarness(async ({ browser, baseUrl }) => {
         const page = await browser.newPage();
         await page.goto(`${baseUrl}/article.html`, { waitUntil: 'load' });
-        await waitFor(page, () => document.querySelectorAll('span.iw-word').length >= 7);
+        await waitFor(page, () => document.querySelectorAll('span.iw-word').length >= 6);
 
         const fenced = await page.evaluate(() => ({
           pre: document.querySelector('#code-block').querySelectorAll('span.iw-word').length,
@@ -273,7 +275,7 @@ export const tests = [
       await withHarness(async ({ browser, baseUrl }) => {
         const page = await browser.newPage();
         await page.goto(`${baseUrl}/article.html`, { waitUntil: 'load' });
-        await waitFor(page, () => document.querySelectorAll('span.iw-word').length >= 7);
+        await waitFor(page, () => document.querySelectorAll('span.iw-word').length >= 6);
 
         await page.click('#append-more');
         // debounce (250 ms) + batched scan — generous window.

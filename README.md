@@ -3,8 +3,11 @@
 A Chrome extension (Manifest V3) that turns any English web page into a structured
 language-learning session:
 
-- **Unknown-word tagging** — words beyond your frequency level (2k/5k/10k/20k) are
-  marked on the page; lemma-aware, so "stood" counts as "stand".
+- **Unknown-word tagging** — the page stays quiet by default: only words
+  you're Learning and truly rare ones (beyond the top 20,000) are marked;
+  a study pass or "full" setting marks everything beyond your level
+  (2k/5k/10k/20k). Lemma-aware, so "stood" counts as "stand"; double-click
+  reaches any word.
 - **Monolingual dictionary** — English-only definitions in a click popover
   (bundled WordNet-derived offline core + optional free online fallback).
 - **Personal vocabulary** — classify words Known / Learning / Unknown / Ignore;

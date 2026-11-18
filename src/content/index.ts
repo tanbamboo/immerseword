@@ -281,12 +281,13 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'sync' || !changes['iw:settings'] || !tagger) return;
   const next = { ...DEFAULT_SETTINGS, ...(changes['iw:settings'].newValue as Partial<IwSettings>) };
   const levelChanged = next.level !== currentSettings.level;
+  const densityChanged = next.tagDensity !== currentSettings.tagDensity;
   currentSettings = next;
   tagger.applySettings(next);
   applyP1MarksSetting(next);
   applyTagStyleSetting(next);
   applyPopoverWidthSetting(next);
-  if (levelChanged) {
+  if (levelChanged || densityChanged) {
     tagger.untag();
     if (next.taggingEnabled) void tagger.scan(document.body);
   }
@@ -318,11 +319,26 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 let passPill: ReturnType<typeof createPassPill> | null = null;
 
+/** SIP-010: true while the tab's session is in the Study pass (pass 2). */
+let studyModeActive = false;
+
 function applySession(session: IwSession | null): void {
   if (session) {
     document.documentElement.dataset.iwPass = String(session.pass);
   } else {
     delete document.documentElement.dataset.iwPass;
+  }
+  // Study-pass elevation (SIP-010): candidates use the full level band
+  // while studying. Only the quiet density feels the flip — under 'full'
+  // the effective rule never changes, so no retag churn.
+  const study = session?.pass === 2;
+  if (tagger && study !== studyModeActive) {
+    studyModeActive = study;
+    tagger.setStudyMode(study);
+    if (currentSettings.tagDensity !== 'full' && currentSettings.taggingEnabled) {
+      tagger.untag();
+      void tagger.scan(document.body);
+    }
   }
   passPill?.update(session);
 }

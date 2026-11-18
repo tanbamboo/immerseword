@@ -130,3 +130,21 @@ Analysis and implementation live in [../sip_logs.md](../sip_logs.md).
 
 > in the popover window, please increase the font size of the lookup
 > word.
+
+---
+
+## feat-2026-11-18-002 — quiet tagging: candidates only when really needed
+
+**Recorded:** 2026-11-18 09:32 +0800
+**Source:** user request (ZCode session — design discussion, direction confirmed)
+**Status:** implemented — PR-33 (`pr/33-quiet-tagging`); see SIP-010
+
+**Raw request:**
+
+> after using the extension for a few days, I am thinking a foundational
+> problem: which words should be tagged as candidate? for the immersive
+> and fluent reading and browsing, it should only tag really needed words
+> as less as possible, like Learning status words and really complex and
+> above user's vocabulary. even the extension didn't tag a word, users
+> still can double click to lookup the definition if they want. but if
+> tagged too much, it will distract the attention of user
