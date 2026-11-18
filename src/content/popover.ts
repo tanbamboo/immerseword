@@ -36,7 +36,7 @@ const STYLE = `
     padding: 12px 14px;
   }
   .head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
-  .lemma { font-size: 17px; font-weight: 700; }
+  .lemma { font-size: 20px; font-weight: 700; }
   .phon { color: #616e7c; font-size: 12px; }
   .add {
     margin-left: 4px; flex: none; align-self: center;
