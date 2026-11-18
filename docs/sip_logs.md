@@ -442,3 +442,21 @@ PR merges. Append-only — never rewrite a merged proposal.
   never a recommended link — opens it stacked). Root cause of the "A"/"O"
   links recorded in the proposal: the frequency list excludes
   single-letter words, so they rank 0 = rarer-than-every-band.
+
+---
+
+## SIP-009 — larger popover headword (SIP-008 follow-up)
+
+- **Requested:** 2026-11-18 (`feat-2026-11-18-001`)
+- **Motivation:** with stacked navigation (SIP-008) the headword carries
+  more weight — it is the answer to "where am I now?" — and at 17px it
+  reads barely larger than the 13px body definitions.
+- **Scope:** presentation-only: `.lemma` font-size 17px → 20px (the
+  stacked "‹ Back" control and phonetics stay as they are).
+- **Test plan:** no new assertions (house rule from SIP-006: don't
+  unit-test CSS); existing suite must stay green.
+- **Risks:** none — one stylesheet value; the head row is flex with
+  baseline alignment, so taller glyphs reflow cleanly.
+- **Outcome:** implemented in PR-32 (`pr/32-lemma-size`). Gates:
+  typecheck, unit 155/155, e2e 39/39 — unchanged, as expected for a
+  one-value stylesheet change.

@@ -117,3 +117,16 @@ Analysis and implementation live in [../sip_logs.md](../sip_logs.md).
 > or double click any word on the popover window, the new popover window
 > should float over the original, and there should be a "back" button,
 > click it can "back" to the original one.
+
+---
+
+## feat-2026-11-18-001 — larger lookup word in the popover
+
+**Recorded:** 2026-11-18 08:59 +0800
+**Source:** user request (ZCode session)
+**Status:** implemented — PR-32 (`pr/32-lemma-size`); see SIP-009
+
+**Raw request:**
+
+> in the popover window, please increase the font size of the lookup
+> word.
