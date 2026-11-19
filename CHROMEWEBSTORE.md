@@ -1,6 +1,24 @@
 # Chrome Web Store Listing — ImmerseWord
 
-> Last Updated: 2026-11-10
+> Last Updated: 2026-11-19
+
+## Published
+
+**✅ v1.0.0 is live — published 2026-11-19.**
+
+| | |
+|---|---|
+| **Item ID** | `ndfeogobbcfkmegldedocacdkkpoipgl` |
+| **Listing** | https://chrome.google.com/webstore/detail/ndfeogobbcfkmegldedocacdkkpoipgl |
+| **Item Name** | ImmerseWord |
+| **Item Type** | extension |
+| **Visibility** | Public |
+
+The **store-assigned extension ID differs from the dev ID** (`dlolccjcdeapekdabdmjbonnmpninmoh`, derived from the pinned manifest key the e2e harness uses) — expected, since the uploaded package strips the dev `key` (SBFP-009). Nothing depends on the public ID; use the store link above for sharing.
+
+**Known post-publish behavior:** users with Enhanced Safe Browsing see "This extension is not trusted by Enhanced Safe Browsing" on install — standard for every newly published extension whose developer has no store track record yet. It is not a policy flag; users can proceed via "Continue to install", and it fades as installs, ratings, and update history accumulate. No developer-side action exists (see [Google's help page](https://support.google.com/chrome_webstore/answer/2664769)).
+
+**Publishing future versions:** bump `version` in `public/manifest.json` + `package.json` → gates → `npm run package` → upload the new zip in the dashboard (new version row below) → submit. Never hand-zip `dist/` (SBFP-009).
 
 ## Store Listing
 
@@ -142,7 +160,7 @@ https://github.com/tanbamboo/immerseword
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
-| 1.0.0 | 2026-11-10 | First release: unknown-word tagging with 5 frequency levels, monolingual dictionary (offline core + optional online fallback), personal vocabulary, guided 3-pass reading sessions with summaries, immersive reader with themes/typography, side-panel reading companion, data export/import. | Draft |
+| 1.0.0 | 2026-11-19 | First release: quiet unknown-word tagging (Learning/Unknown + beyond-corpus words; full-band via setting or Study pass), monolingual dictionary with offline core + optional online fallback, WordNet synonyms, tappable definition words with stacked Back navigation, personal vocabulary, guided 3-pass reading sessions with summaries, immersive reader with themes/typography, side-panel reading companion, data export/import. | **Published** |
 
 ## Review Notes
 
