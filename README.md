@@ -1,5 +1,7 @@
 # ImmerseWord
 
+**[Install from the Chrome Web Store](https://chrome.google.com/webstore/detail/ndfeogobbcfkmegldedocacdkkpoipgl)**
+
 A Chrome extension (Manifest V3) that turns any English web page into a structured
 language-learning session:
 
@@ -19,7 +21,7 @@ language-learning session:
 - **Side-panel reading companion** — page stats, coverage, word lists, and a
   searchable vocabulary browser.
 
-## Status — v1.0.0
+## Status — v1.0.0 · [published 2026-11-19](https://chrome.google.com/webstore/detail/ndfeogobbcfkmegldedocacdkkpoipgl)
 
 | PR | Scope | State |
 |----|-------|-------|

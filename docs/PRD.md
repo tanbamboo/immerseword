@@ -228,5 +228,7 @@ pages; frequency + personal list make every next page smarter.
 ## 9. Release
 
 - Manifest V3, Chrome stable ≥ 120 (verified against current stable in E2E).
-- Distributed via Chrome Web Store (see `CHROMEWEBSTORE.md`); unpacked load supported for
+- Distributed via Chrome Web Store — v1.0.0 published 2026-11-19:
+  https://chrome.google.com/webstore/detail/ndfeogobbcfkmegldedocacdkkpoipgl
+  (see `CHROMEWEBSTORE.md`); unpacked load supported for
   development.
