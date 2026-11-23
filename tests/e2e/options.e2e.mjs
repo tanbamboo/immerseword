@@ -29,7 +29,7 @@ export const tests = [
           tagging: document.querySelector('#opt-tagging').checked,
           theme: document.querySelector('#opt-theme').value,
         }));
-        assert.ok(state.version.includes('1.0.0'), state.version);
+        assert.match(state.version, /v1\.\d+\.\d+ — your words stay/, 'version renders (v-prefixed semver)');
         assert.ok(state.version.includes('this device'));
         assert.equal(state.level, '5k');
         assert.equal(state.tagging, true);

@@ -160,7 +160,8 @@ https://github.com/tanbamboo/immerseword
 
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
-| 1.0.0 | 2026-11-19 | First release: quiet unknown-word tagging (Learning/Unknown + beyond-corpus words; full-band via setting or Study pass), monolingual dictionary with offline core + optional online fallback, WordNet synonyms, tappable definition words with stacked Back navigation, personal vocabulary, guided 3-pass reading sessions with summaries, immersive reader with themes/typography, side-panel reading companion, data export/import. | **Published** |
+| 1.0.0 | 2026-11-19 | First release. **Note:** the uploaded package was the build from just after the `key`-stripping fix (SBFP-009) — it predates the icon regeneration (SBFP-010), synonyms, definition links, stacked navigation, and quiet tagging. | **Published** |
+| 1.0.1 | 2026-11-23 | Quiet tagging default (Learning/Unknown + beyond-corpus words; Study pass elevates to the full band; "Tag density" setting keeps legacy marking). Synonyms row in the popover (WordNet synsets, offline). Tappable rare words inside definitions + double-click any word in the popover + stacked lookups with ‹ Back. Larger headword. Correct-size manifest icons (16/48/128 px). | Pending upload |
 
 ## Review Notes
 
