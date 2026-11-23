@@ -21,7 +21,7 @@ language-learning session:
 - **Side-panel reading companion** — page stats, coverage, word lists, and a
   searchable vocabulary browser.
 
-## Status — v1.0.0 · [published 2026-11-19](https://chrome.google.com/webstore/detail/ndfeogobbcfkmegldedocacdkkpoipgl)
+## Status — v1.0.1 · [store](https://chrome.google.com/webstore/detail/ndfeogobbcfkmegldedocacdkkpoipgl)
 
 | PR | Scope | State |
 |----|-------|-------|
