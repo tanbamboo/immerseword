@@ -437,10 +437,10 @@ export const tests = [
       await withHarness(async ({ browser, baseUrl }) => {
         const page = await openArticle(browser, baseUrl);
 
-        // Classify observe → unknown, petrichor → known.
+        // Classify observe → unknown, effulgence → known.
         for (const [lemma, status] of [
           ['observe', 'unknown'],
-          ['petrichor', 'known'],
+          ['effulgence', 'known'],
         ]) {
           await clickWord(page, lemma);
           // Wait until lookup settles: the status row renders in BOTH the
@@ -472,12 +472,12 @@ export const tests = [
         );
         const statuses = await page.evaluate(() => ({
           observe: document.querySelector('span.iw-word[data-lemma="observe"]')?.dataset.iwStatus,
-          petrichorSpan: document.querySelector('span.iw-word[data-lemma="petrichor"]') !== null,
+          effulgenceSpan: document.querySelector('span.iw-word[data-lemma="effulgence"]') !== null,
         }));
         assert.equal(statuses.observe, 'unknown', 'observe stays unknown after reload');
         // Known words are not tagged at all on fresh scans — the
         // personalization loop (PRD §7): every page you classify gets quieter.
-        assert.equal(statuses.petrichorSpan, false, 'petrichor (known) is no longer tagged');
+        assert.equal(statuses.effulgenceSpan, false, 'effulgence (known) is no longer tagged');
         await page.close();
       });
     },

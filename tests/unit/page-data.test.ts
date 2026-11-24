@@ -34,7 +34,7 @@ describe('collectPageData', () => {
 
   it('counts untagged tokens so coverage reflects the whole page', () => {
     const p = document.createElement('p');
-    p.append('One two three four ', tag('petrichor', 'unknown'), ' six seven eight.');
+    p.append('One two three four ', tag('effulgence', 'unknown'), ' six seven eight.');
     document.body.append(p);
 
     const { stats } = collectPageData(document.body);

@@ -478,3 +478,58 @@ merges. Append-only — never rewrite a merged proposal.
   unit 140/140, e2e 37/37. Verified: manifest icons exactly
   16/48/128 px; `store/icons/store-icon-128.png` is 128×128 RGBA with
   a 96×96 opaque artwork box centered (16 px padding).
+
+---
+
+## SBFP-011 — non-English words tagged: rank-0 conflates "rare English" with "not English"
+
+- **Reported:** 2026-11-24 (`bug-2026-11-24-001`)
+- **Symptom:** pages mark many non-English words (transliterations,
+  foreign vocabulary, name-like strings) as candidates, in every density
+  mode — "too much none English words been tagged".
+- **Root cause:** the candidate rule treats **rank 0** (absent from the
+  bundled 20k frequency list) as "rarer than every band" — i.e. rare
+  *English*. But rank 0 also describes every token that simply is not
+  English at all: a frequency list proves membership of its 20k entries,
+  nothing about the rest of the language, let alone other languages.
+- **Evidence:** `frequency.isRarerThan` (`r === 0 || …`); `tagger.classify`
+  rank-0 path; repro: any pinyin/romanized string on a page gets a
+  dotted mark.
+- **Dictionary survey (reporter asked for OED):** OED is proprietary with
+  no offline dump — unusable. WordNet 3.1 (~155k curated lemmas,
+  Princeton license, attribution already shipped, index parser already in
+  `build-data.mjs`) is the validated offline lexicon that fits this
+  project. SCOWL/hunspell (permissive, spell-checker grade) and
+  Wiktionary extractions (MIT, but permissive to the point of admitting
+  junk) noted as alternatives.
+- **Fix:**
+  - `build-data.mjs` emits `public/data/english.json` — the union of
+    single-word lowercase lemmas across WordNet's four POS index files
+    (the same `/^[a-z]+$/` filter `parseIndex` already applies).
+  - Manifest `web_accessible_resources` adds `data/english.json`.
+  - `content/index.ts` loads it and hands the tagger an `isEnglish`
+    predicate; `tagger.classify` gates the rank-0 path in **both**
+    densities: unlisted + not in the lexicon → never tagged; unlisted +
+    in the lexicon → the "really complex English" candidate as before.
+    Statuses (learning/unknown) still override — the user's own
+    classifications are truth regardless of lexicons.
+  - Popover definition-links (`isLinkable`) get the same gate for
+    consistency.
+- **Verification plan:** unit — classify matrix (unlisted+English →
+  candidate; unlisted+non-English → null; both densities; statuses
+  override); data — english.json contains the fixture's rare English
+  (petrichor, gossamer, serendipity, tintinnabulation, defenestration,
+  susurrus) and excludes non-English probes; e2e — a mixed-language
+  paragraph tags the English rare words and none of the non-English ones.
+- **Risks / edge cases:** loanwords genuinely in English dictionaries
+  (schadenfreude) tag — correct, they are English now; rare English
+  absent from WordNet (~rare, e.g. very new coinages) goes untagged —
+  acceptable, dblclick still reaches them; data grows (~1 MB raw JSON,
+  compresses well in the store zip); no new license (WordNet attribution
+  already shipped).
+- **Outcome:** fixed in PR-37 (`pr/37-english-validation`). Gates:
+  typecheck, unit 162/162, e2e 40/40 (new live-page case: a mixed-language
+  paragraph tags only the validated-English rare word). english.json =
+  77,561 lemmas / 0.86 MB; store zip 1.0.2 = 961 KB. One consequence
+  recorded: "petrichor" postdates WordNet 3.1 and is now untagged — the
+  fixture vocabulary swapped it for "effulgence" (WordNet ✓ rank 0 ✓).

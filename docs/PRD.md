@@ -66,7 +66,9 @@ pedagogically sound.
   2. the **candidate rule** (SIP-010): in the default *quiet* density, only words
      **absent from the 20k corpus** ("really complex") are candidates; the *full*
      density restores the original rarer-than-level rule; during the 3-pass Study
-     pass, candidates always use the full level band. Rationale: tagging is a
+     pass, candidates always use the full level band. Words absent from the corpus
+     must additionally be **validated English** against the bundled WordNet lemma
+     lexicon (SBFP-011) — non-English tokens are never tagged. Rationale: tagging is a
      recommendation, not the only entry (dblclick reaches any word), so marks are
      spent only where they earn attention — over-tagging distracts from fluent
      reading.
