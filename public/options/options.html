@@ -66,6 +66,28 @@
     </section>
 
     <section class="opt-card">
+      <h2>Learner's dictionary (optional)</h2>
+      <p class="opt-hint">
+        Full-sentence definitions written for learners, from the Merriam-Webster Learner's
+        Dictionary. Used after the offline dictionary and the online fallback both miss a
+        word. Get a free API key at
+        <a href="https://www.dictionaryapi.com" target="_blank" rel="noreferrer">dictionaryapi.com</a>
+        (1,000 lookups/day, non-commercial). The key stays on this device.
+      </p>
+      <label class="opt-row">
+        <span>Merriam-Webster API key</span>
+        <input type="password" id="opt-mw-key" placeholder="paste your key" autocomplete="off" />
+      </label>
+      <div class="opt-row">
+        <span id="opt-mw-status"></span>
+        <span style="display:flex; gap:8px;">
+          <button class="iw-ghost" id="opt-mw-save" type="button">Save key</button>
+          <button class="iw-ghost" id="opt-mw-clear" type="button">Remove</button>
+        </span>
+      </div>
+    </section>
+
+    <section class="opt-card">
       <h2>Reader defaults</h2>
       <div class="opt-two">
         <label class="opt-row">

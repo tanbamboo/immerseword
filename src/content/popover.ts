@@ -402,10 +402,15 @@ export function createPopover(deps: PopoverDeps) {
     }
     card.append(row);
 
-    if (source === 'core' || source === 'api' || source === 'cache') {
+    if (source === 'core' || source === 'api' || source === 'mw' || source === 'cache') {
       const src = document.createElement('div');
       src.className = 'src';
-      src.textContent = source === 'core' ? 'offline dictionary' : 'dictionaryapi.dev';
+      src.textContent =
+        source === 'core'
+          ? 'offline dictionary'
+          : source === 'mw'
+            ? "Merriam-Webster Learner's"
+            : 'dictionaryapi.dev';
       card.append(src);
     }
 

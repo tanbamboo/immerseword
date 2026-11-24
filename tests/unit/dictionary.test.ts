@@ -3,6 +3,7 @@ import {
   cleanSynonyms,
   createDictionaryService,
   normalizeApiEntry,
+  normalizeMwLearnersEntry,
   type CoreDictionary,
 } from '../../src/background/dictionary';
 import { DEFAULT_SETTINGS, type IwSettings } from '../../src/shared/types';
@@ -53,12 +54,36 @@ function apiResponse(lemma: string) {
   ];
 }
 
-function makeService(overrides: { settings?: IwSettings } = {}) {
+const MW_LEARNERS_FIXTURE = [
+  {
+    meta: { id: 'qat' },
+    hwi: { hw: 'qat', prs: [{ mw: 'ˈkɑːt' }] },
+    fl: 'noun',
+    def: [
+      {
+        fl: 'noun',
+        senses: [
+          {
+            dt: [
+              ['text', 'a plant whose leaves are chewed {it}as a stimulant{/it}'],
+              ['vis', [{ t: 'The leaves of the qat plant are chewed.' }]],
+            ],
+          },
+        ],
+      },
+    ],
+  },
+];
+
+function makeService(overrides: { settings?: IwSettings; mwKey?: string } = {}) {
   const storage = fakeStorage();
   const fetchCalls: string[] = [];
   const service = createDictionaryService({
     fetchImpl: (async (url: string) => {
       fetchCalls.push(url);
+      if (url.includes('dictionaryapi.com') && url.includes('/qat')) {
+        return { ok: true, status: 200, json: async () => MW_LEARNERS_FIXTURE };
+      }
       if (url.endsWith('/serendipity')) {
         return { ok: true, status: 200, json: async () => apiResponse('serendipity') };
       }
@@ -67,6 +92,7 @@ function makeService(overrides: { settings?: IwSettings } = {}) {
     storage,
     loadCore: async () => CORE,
     getSettings: async () => overrides.settings ?? DEFAULT_SETTINGS,
+    getMwKey: async () => overrides.mwKey ?? '',
   });
   return { service, storage, fetchCalls };
 }
@@ -147,6 +173,7 @@ describe('dictionary service — lookup chain', () => {
       storage,
       loadCore: async () => null, // no core at all
       getSettings: async () => DEFAULT_SETTINGS,
+    getMwKey: async () => '',
     });
     expect((await service.lookup('serendipity')).source).toBe('none');
     expect((await service.lookup('serendipity')).source).toBe('none');
@@ -166,6 +193,7 @@ describe('dictionary service — lookup chain', () => {
         return CORE;
       },
       getSettings: async () => ({ ...DEFAULT_SETTINGS, onlineFallback: false }),
+    getMwKey: async () => '',
     });
 
     // First lookup: core load fails transiently → degrades (offline → none)…
@@ -187,6 +215,7 @@ describe('dictionary service — lookup chain', () => {
       storage: fakeStorage(),
       loadCore: async () => null,
       getSettings: async () => DEFAULT_SETTINGS,
+    getMwKey: async () => '',
     });
     expect((await custom.lookup('study')).source).toBe('none');
     expect((await service.lookup('study')).source).toBe('core'); // sanity
@@ -201,6 +230,7 @@ describe('dictionary cache — LRU pruning', () => {
       storage,
       loadCore: async () => null,
       getSettings: async () => DEFAULT_SETTINGS,
+    getMwKey: async () => '',
     });
     for (let i = 0; i < 2_050; i++) {
       await service.lookup(`w${i}q`); // 404 → negative cache entries
@@ -272,5 +302,70 @@ describe('synonyms (SIP-005)', () => {
     expect(words).toHaveLength(12); // e.g. wam, wbn … letter-only, all valid
     expect(cleanSynonyms(words, 'lemma')).toHaveLength(8);
     expect(cleanSynonyms('not-an-array' as never, 'lemma')).toEqual([]);
+  });
+});
+
+describe("Merriam-Webster Learner's tier (SIP-012)", () => {
+  const MW_BODY = [
+    {
+      meta: { id: 'copiously' },
+      hwi: { hw: 'copiously', prs: [{ mw: 'ˈkoʊ-pi-əs-li', sound: { audio: 'copio01' } }] },
+      fl: 'adverb',
+      def: [
+        {
+          fl: 'adverb',
+          senses: [
+            {
+              dt: [
+                ['text', 'in large amounts {it}rained copiously{/it}'],
+                ['vis', [{ t: 'He wrote copiously on the subject.' }]],
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ];
+
+  it('normalizes the MW learners shape: phonetics, POS, sense, example', () => {
+    const entry = normalizeMwLearnersEntry('copiously', MW_BODY);
+    expect(entry?.lemma).toBe('copiously');
+    expect(entry?.phonetic).toBe('/ˈkoʊ-pi-əs-li/');
+    expect(entry?.senses).toHaveLength(1);
+    expect(entry?.senses[0]?.partOfSpeech).toBe('adverb');
+    expect(entry?.senses[0]?.definition).toBe('in large amounts rained copiously');
+    expect(entry?.senses[0]?.example).toBe('He wrote copiously on the subject.');
+  });
+
+  it('returns null for empty or malformed bodies', () => {
+    expect(normalizeMwLearnersEntry('x', [])).toBeNull();
+    expect(normalizeMwLearnersEntry('x', [{ meta: { id: 'x' } }])).toBeNull();
+  });
+
+  it('answers last: only after core miss, cache miss, and dev miss', async () => {
+    const { service, storage, fetchCalls } = makeService({ mwKey: 'test-key' });
+    const result = await service.lookup('qat');
+    expect(fetchCalls.some((u) => u.includes('dictionaryapi.dev'))).toBe(true);
+    expect(fetchCalls.some((u) => u.includes('dictionaryapi.com') && u.includes('key=test-key'))).toBe(true);
+    expect(result.source).toBe('mw');
+    expect(result.entry?.senses[0]?.definition).toBe('a plant whose leaves are chewed as a stimulant');
+    // Cached: the second lookup makes no network calls at all.
+    const again = await service.lookup('qat');
+    expect(again.source).toBe('cache');
+    expect(fetchCalls.filter((u) => u.includes('dictionaryapi.com'))).toHaveLength(1);
+    expect(storage.dump().size).toBeGreaterThan(0);
+  });
+
+  it('never contacts MW without a key', async () => {
+    const { service, fetchCalls } = makeService();
+    await service.lookup('qat'); // core miss → dev 404 → no key → none
+    expect(fetchCalls.some((u) => u.includes('dictionaryapi.com'))).toBe(false);
+  });
+
+  it('a MW 404 ends the chain as none', async () => {
+    const { service } = makeService({ mwKey: 'test-key' });
+    const result = await service.lookup('zzzznope');
+    expect(result.source).toBe('none');
+    expect(result.entry).toBeNull();
   });
 });

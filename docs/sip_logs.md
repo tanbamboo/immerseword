@@ -519,3 +519,50 @@ PR merges. Append-only — never rewrite a merged proposal.
   load — no retag race). One mid-spec footgun found by the run: hand-built
   settings payloads must now include tagDensity or the merge-over-defaults
   silently flips the page to quiet (SIP-004 spec fixed).
+
+---
+
+## SIP-012 — Merriam-Webster Learner's Dictionary as an opt-in third tier
+
+- **Requested:** 2026-11-24 (`feat-2026-11-24-002`)
+- **Motivation:** WordNet glosses are telegraphic and sometimes circular;
+  dictionaryapi.dev is Wiktionary-derived and uneven — neither is written
+  for learners. Learner's dictionaries define in full sentences with a
+  small defining vocabulary: exactly what a B1–B2 reader needs.
+- **Survey:** Oxford Learner's — enterprise-priced, no practical free
+  tier; Cambridge — keys gated behind sales; unofficial Oxford scrapers
+  — ToS-violating, rejected. Merriam-Webster Learner's
+  (dictionaryapi.com) — free non-commercial tier, 1,000 queries/day,
+  self-service key. Chosen.
+- **Scope (reporter-confirmed chain order):**
+  `bundled core → dictionaryapi.dev (when online fallback on) →
+  Merriam-Webster Learner's (when a key is configured) → none`.
+  Learner's is appended LAST: existing behavior is unchanged unless the
+  user opts in by pasting a key.
+- **Design:**
+  - The key is a credential, not a setting: stored in
+    `chrome.storage.local` under `iw:mwKey` (never synced, never included
+    in export/import payloads). Presence of a non-empty key = enabled.
+  - `normalizeMwLearnersEntry` maps the MW v3 learners JSON (hwi.prs
+    phonetics, fl part of speech, def[].senses[].dt text + vis examples)
+    to `DictionaryEntry`, ≤3 senses; results enter the existing LRU
+    cache; source badge "Merriam-Webster Learner's".
+  - Auth failures (401/403) are not negative-cached (the key may be
+    fixed later); 404s cache negatively like the other tiers.
+- **Test plan:** unit — MW normalizer against a recorded fixture; service
+  chain (core miss + dev miss + key → MW called and cached; no key → MW
+  never called; MW 404 → none); popover badge. e2e — options-page key
+  save/mask/clear round-trips storage.local (no network in tests).
+- **Risks / edge cases:** MW-last means learner's definitions surface only
+  when both existing tiers miss (the reporter's explicit choice — the
+  one-line flip to learner's-first is a settings question for a future
+  SIP if desired); key quota (1,000/day) is per-user, cached results
+  don't consume it; new disclosed endpoint only when enabled (privacy
+  docs updated); no account is created — the user brings their own key.
+- **Docs:** PRD F2 (chain) + F6 (key field); PRIVACY.md; CHROMEWEBSTORE
+  data-use table.
+- **Outcome:** implemented in PR-38 (`pr/38-learners-dictionary`). Gates:
+  typecheck, unit 167/167, e2e 41/41 (key save/mask/clear round-trips
+  storage.local; no network in tests). v1.0.3 packaged. Default behavior
+  byte-identical for users without a key — the tier only activates when
+  `iw:mwKey` is set.

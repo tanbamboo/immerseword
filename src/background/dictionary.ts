@@ -28,7 +28,7 @@ const POS_LABEL: Record<string, string> = {
   r: 'adverb',
 };
 
-export type DictSource = 'core' | 'api' | 'cache' | 'none';
+export type DictSource = 'core' | 'api' | 'mw' | 'cache' | 'none';
 
 export interface LookupResult {
   lemma: string;
@@ -63,6 +63,8 @@ export interface DictionaryDeps {
   storage: LocalStorageLike;
   loadCore: () => Promise<CoreDictionary | null>;
   getSettings: () => Promise<IwSettings>;
+  /** SIP-012: the Merriam-Webster Learner's key ('' = tier disabled). */
+  getMwKey: () => Promise<string>;
 }
 
 export function createDictionaryService(deps: DictionaryDeps) {
@@ -147,6 +149,35 @@ export function createDictionaryService(deps: DictionaryDeps) {
     }
   }
 
+  /**
+   * SIP-012 tier 3 — Merriam-Webster Learner's Dictionary, only when the
+   * user pasted a key (dictionaryapi.com, free non-commercial tier).
+   * 404s negative-cache like the other tiers; auth failures do NOT (the
+   * key may be fixed on the options page at any time).
+   */
+  async function fromMwLearners(lemma: string, key: string): Promise<LookupResult> {
+    try {
+      const res = await deps.fetchImpl(
+        `https://api.dictionaryapi.com/api/v3/references/learners/json/${encodeURIComponent(lemma)}?key=${encodeURIComponent(key)}`,
+        { signal: AbortSignal.timeout(8_000) },
+      );
+      if (!res.ok) {
+        if (res.status === 404) await writeCache(lemma, { neg: Date.now() });
+        else console.warn('[ImmerseWord] Merriam-Webster Learner\'s request failed:', res.status);
+        return { lemma, entry: null, source: 'none' };
+      }
+      const entry = normalizeMwLearnersEntry(lemma, await res.json());
+      if (!entry) {
+        await writeCache(lemma, { neg: Date.now() });
+        return { lemma, entry: null, source: 'none' };
+      }
+      await writeCache(lemma, { e: entry });
+      return { lemma, entry, source: 'mw' };
+    } catch {
+      return { lemma, entry: null, source: 'none' };
+    }
+  }
+
   return {
     async lookup(rawLemma: string): Promise<LookupResult> {
       const surface = rawLemma.toLowerCase().trim();
@@ -174,9 +205,16 @@ export function createDictionaryService(deps: DictionaryDeps) {
       if (cached) return cached;
 
       const settings = await deps.getSettings();
-      if (!settings.onlineFallback) return { lemma, entry: null, source: 'none' };
+      if (settings.onlineFallback) {
+        const api = await fromApi(lemma);
+        if (api.entry) return api;
+      }
 
-      return fromApi(lemma);
+      // SIP-012: learner's tier — appended last, opt-in via stored key.
+      const mwKey = (await deps.getMwKey()).trim();
+      if (mwKey) return fromMwLearners(lemma, mwKey);
+
+      return { lemma, entry: null, source: 'none' };
     },
   };
 }
@@ -232,5 +270,53 @@ export function normalizeApiEntry(lemma: string, body: unknown): DictionaryEntry
   if (phonetic) entry.phonetic = phonetic;
   const syns = cleanSynonyms(rawSyns, lemma);
   if (syns.length > 0) entry.synonyms = syns;
+  return entry;
+}
+
+/**
+ * SIP-012: maps a Merriam-Webster Learner's v3 JSON response (array) to
+ * our DictionaryEntry. Shape (abridged): entries[0] carries
+ * `hwi.hw` (headword), `hwi.prs[0].mw` (pronunciation), `fl` (functional
+ * label = part of speech), `def[].senses[].dt` — a list of typed items
+ * where ["text", …] is the definition and ["vis", [{t}]] holds examples.
+ */
+export function normalizeMwLearnersEntry(lemma: string, body: unknown): DictionaryEntry | null {
+  if (!Array.isArray(body) || body.length === 0) return null;
+  const first = body[0] as {
+    hwi?: { hw?: string; prs?: Array<{ mw?: string }> };
+    fl?: string;
+    def?: Array<{
+      fl?: string;
+      senses?: Array<{
+        dt?: Array<[string, unknown]>;
+      }>;
+    }>;
+  };
+  if (!first.def?.length) return null;
+
+  const phonetic = first.hwi?.prs?.map((p) => p.mw).find((t) => !!t && t.length > 0);
+  const senses: DictionarySense[] = [];
+  outer: for (const defGroup of first.def) {
+    const partOfSpeech = defGroup.fl ?? first.fl;
+    for (const sense of defGroup.senses ?? []) {
+      const dt = sense.dt ?? [];
+      const textItem = dt.find(([tag]) => tag === 'text');
+      if (!textItem || typeof textItem[1] !== 'string' || !textItem[1].trim()) continue;
+      const senseEntry: DictionarySense = {
+        partOfSpeech,
+        definition: textItem[1].replace(/\s*\{[^}]*\}\s*/g, ' ').replace(/\s+/g, ' ').trim(),
+      };
+      const visItem = dt.find(([tag]) => tag === 'vis');
+      const example = Array.isArray(visItem?.[1])
+        ? ((visItem[1] as Array<{ t?: string }>)[0]?.t ?? undefined)
+        : undefined;
+      if (example) senseEntry.example = example.replace(/\s+/g, ' ').trim();
+      senses.push(senseEntry);
+      if (senses.length >= 3) break outer;
+    }
+  }
+  if (senses.length === 0) return null;
+  const entry: DictionaryEntry = { lemma, senses };
+  if (phonetic) entry.phonetic = `/${phonetic}/`;
   return entry;
 }

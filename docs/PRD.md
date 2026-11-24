@@ -121,7 +121,11 @@ pedagogically sound.
   - popover width configurable — Compact 320 / Default 480 / Wide 640 px (F6), responsive
     clamp on narrow viewports
 - Lookup chain: **bundled offline core** (top-frequency lemmas with WordNet glosses) →
-  **Free Dictionary API** (dictionaryapi.dev) → graceful "no definition found" state.
+  **Free Dictionary API** (dictionaryapi.dev, when online fallback is on) →
+  **Merriam-Webster Learner's Dictionary** (opt-in third tier, only when the user
+  pasted an API key — full-sentence learner definitions; SIP-012) → graceful
+  "no definition found" state. The key lives in `chrome.storage.local`, is never
+  synced, and is excluded from export/import.
 - API responses are cached in `chrome.storage.local` (LRU, capped ≈ 2 MB / 2,000 entries).
 - No translations are ever shown. This is a product principle, not a limitation.
 
@@ -178,7 +182,8 @@ Options page + side panel quick settings:
 - Popover width: 320 / 480 / 640 px (default **480**)
 - Pass 1 behavior: hide tags entirely vs. faint marks
 - Reader defaults: theme, font, size, width, line height
-- Dictionary: online fallback on/off (offline-only mode)
+- Dictionary: online fallback on/off (offline-only mode); Learner's-dictionary
+  API key (Merriam-Webster) — presence enables the tier
 - Data: import/export, clear dictionary cache, reset vocabulary
 
 ## 5. UX flows
