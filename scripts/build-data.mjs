@@ -150,7 +150,22 @@ async function main() {
   );
   writeFileSync(dictPath, JSON.stringify(core));
 
-  // ── 3. Attribution ─────────────────────────────────────────────────────
+  // ── 3. English lexicon (SBFP-011) ────────────────────────────────────────
+  // Single-word lowercase lemmas across all four POS indexes: the offline
+  // validator that separates "rare English" (taggable) from "not English"
+  // (never tagged). Same /^[a-z]+$/ filter parseIndex applies.
+  const english = new Set();
+  for (const p of POS_FILES) {
+    for (const lemma of parseIndex(p.index).keys()) english.add(lemma);
+  }
+  const englishPath = resolve(DATA_DIR, 'english.json');
+  writeFileSync(englishPath, JSON.stringify([...english].sort()));
+  console.log(
+    `english.json: ${english.size} validated lemmas ` +
+      `(${(JSON.stringify([...english]).length / 1024 / 1024).toFixed(2)} MB)`,
+  );
+
+  // ── 4. Attribution ─────────────────────────────────────────────────────
   writeFileSync(
     resolve(DATA_DIR, 'ATTRIBUTION.md'),
     `# Bundled data — licenses & sources
@@ -159,8 +174,9 @@ async function main() {
 Top 20,000 English words (Google Trillion Word Corpus) from
 [first20hours/google-10000-english](https://github.com/first20hours/google-10000-english) — MIT License.
 
-## dict-core.json
-Monolingual definitions derived from **WordNet 3.1**,
+## dict-core.json / english.json
+Monolingual definitions and the English-validation lexicon derived from
+**WordNet 3.1**,
 Copyright © 2013 Princeton University. Used under the
 [WordNet License](https://wordnet.princeton.edu/license-and-commercial-use):
 redistribution requires this notice and the license text.

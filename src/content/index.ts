@@ -79,6 +79,18 @@ async function loadFrequencyWords(): Promise<string[]> {
   }
 }
 
+/** SBFP-011: WordNet-derived lexicon separating rare English from non-English. */
+async function loadEnglishLemmas(): Promise<Set<string>> {
+  try {
+    const res = await fetch(chrome.runtime.getURL('data/english.json'));
+    if (!res.ok) return new Set();
+    return new Set((await res.json()) as string[]);
+  } catch (err) {
+    console.error('[ImmerseWord] english data failed to load:', err);
+    return new Set();
+  }
+}
+
 const READER_PREFS_KEY = 'iw:readerPrefs';
 
 async function loadReaderPrefs(): Promise<ReaderPrefs> {
@@ -122,7 +134,9 @@ async function init(): Promise<void> {
   const lemmatizer = createLemmatizer({ knownLemmas: known });
   const index = createFrequencyIndex(words, (s) => lemmatizer.lemma(s));
   resolveWordKey = (word) => index.resolveForm(word);
-  tagger = createTagger({ frequency: index, settings: currentSettings });
+  const englishLemmas = await loadEnglishLemmas();
+  const isEnglish = (lemma: string): boolean => englishLemmas.has(lemma);
+  tagger = createTagger({ frequency: index, settings: currentSettings, isEnglish });
   tagger.setVocab({ statusOf: (lemma) => statusMap.get(lemma) });
 
   const popover = createPopover({
@@ -130,11 +144,13 @@ async function init(): Promise<void> {
     vocab,
     isWordForm: (lemma, token) => lemmatizer.lemma(token.toLowerCase()) === lemma,
     // SIP-007: words rarer than the level (minus known/ignored) chain lookups.
+    // SBFP-011: unlisted tokens must also be validated English.
     isLinkable: (token) => {
       const key = index.resolveForm(token);
       const status = statusMap.get(key);
       if (status === 'known' || status === 'ignored') return false;
-      return index.isRarerThan(key, currentSettings.level);
+      if (!index.isRarerThan(key, currentSettings.level)) return false;
+      return index.rankOf(key) !== 0 || isEnglish(key);
     },
     onStatusChange: (lemma, status) => {
       statusMap.set(lemma, status);

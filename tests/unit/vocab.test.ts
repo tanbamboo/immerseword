@@ -31,17 +31,17 @@ describe('vocab store', () => {
 
   it('persists status changes and preserves history fields', async () => {
     const store = createVocabStore(setup.storage);
-    const first = await store.setStatus('petrichor', 'unknown');
+    const first = await store.setStatus('effulgence', 'unknown');
     expect(first.status).toBe('unknown');
     expect(first.timesSeen).toBe(1);
 
-    const bumped = await store.setStatus('petrichor', 'learning');
+    const bumped = await store.setStatus('effulgence', 'learning');
     expect(bumped.status).toBe('learning');
     expect(bumped.timesSeen).toBe(2);
     expect(bumped.firstSeen).toBe(first.firstSeen);
     expect(bumped.lastSeen).toBeGreaterThanOrEqual(first.lastSeen);
 
-    expect(await store.statusOf('petrichor')).toBe('learning');
+    expect(await store.statusOf('effulgence')).toBe('learning');
   });
 
   it('bumpLookup records lookups without inventing status changes', async () => {
@@ -88,12 +88,12 @@ describe('vocab store', () => {
 
   it('addExample dedupes identical text and refreshes its recency', async () => {
     const store = createVocabStore(setup.storage);
-    await store.addExample('petrichor', { text: 'one.', url: 'https://a/1' });
-    await store.addExample('petrichor', { text: 'two.', url: 'https://a/2' });
-    const older = (await store.getEntry('petrichor'))?.examples?.find((e) => e.text === 'one.');
+    await store.addExample('effulgence', { text: 'one.', url: 'https://a/1' });
+    await store.addExample('effulgence', { text: 'two.', url: 'https://a/2' });
+    const older = (await store.getEntry('effulgence'))?.examples?.find((e) => e.text === 'one.');
     await new Promise((r) => setTimeout(r, 2)); // capturedAt advances
-    await store.addExample('petrichor', { text: 'one.', url: 'https://a/1-again' });
-    const entry = await store.getEntry('petrichor');
+    await store.addExample('effulgence', { text: 'one.', url: 'https://a/1-again' });
+    const entry = await store.getEntry('effulgence');
     expect(entry?.examples?.map((e) => e.text)).toEqual(['one.', 'two.']);
     expect(entry?.examples?.[0]?.url).toBe('https://a/1-again');
     expect(entry?.examples?.[0]?.capturedAt).toBeGreaterThan(older!.capturedAt);

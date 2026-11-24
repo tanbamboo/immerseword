@@ -42,7 +42,7 @@ export const tests = [
             const lemmas = new Set(
               [...shadow.querySelectorAll('span.iw-word')].map((s) => s.dataset.lemma),
             );
-            return ['serendipity', 'petrichor', 'observe'].every((w) => lemmas.has(w));
+            return ['serendipity', 'effulgence', 'observe'].every((w) => lemmas.has(w));
           },
           { timeout: 10_000 },
         );
@@ -59,7 +59,7 @@ export const tests = [
         assert.ok(state.title.includes('The Quiet Hour'), `title extracted, got ${state.title}`);
         // Tagging re-scanned inside the shadow root: rare words present,
         // common words absent.
-        for (const word of ['serendipity', 'petrichor', 'observe']) {
+        for (const word of ['serendipity', 'effulgence', 'observe']) {
           assert.ok(state.taggedLemmas.includes(word), `${word} should be tagged in the reader`);
         }
         for (const word of ['house', 'family']) {

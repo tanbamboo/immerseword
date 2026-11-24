@@ -8,7 +8,7 @@ import { DEFAULT_SETTINGS, type IwSettings, type WordStatus } from '../../src/sh
  * Synthetic corpus with REALISTIC rank positions (padded with placeholders
  * so ranks match the real 20k list): house(3), beautiful(1397),
  * studying(6255), observe(7565); sentence filler sits in the top ~150;
- * every other word (serendipity, petrichor …) is unlisted → rare.
+ * every other word (serendipity, effulgence …) is unlisted → rare.
  */
 const RANKS: Record<string, number> = {
   house: 3,
@@ -42,11 +42,14 @@ function makeIndex() {
   return createFrequencyIndex(WORDS, (s) => createLemmatizer({ knownLemmas: KNOWN }).lemma(s));
 }
 
-function makeTagger(overrides: { settings?: Partial<IwSettings>; vocab?: VocabLike } = {}) {
+function makeTagger(
+  overrides: { settings?: Partial<IwSettings>; vocab?: VocabLike; isEnglish?: (lemma: string) => boolean } = {},
+) {
   return createTagger({
     frequency: makeIndex(),
     settings: { ...DEFAULT_SETTINGS, ...overrides.settings },
     vocab: overrides.vocab,
+    isEnglish: overrides.isEnglish,
   });
 }
 
@@ -158,7 +161,7 @@ describe('tagger — wrapping', () => {
   });
 
   it('tags all occurrences and preserves the surrounding text exactly', async () => {
-    const original = 'The petrichor rose; petrichor after rain is petrichor pure and simple.';
+    const original = 'The effulgence rose; effulgence after rain is effulgence pure and simple.';
     const root = article(`<p>${original}</p>`);
     const tagger = makeTagger();
     await tagger.scan(root);
@@ -253,7 +256,7 @@ describe('tagger — skip rules', () => {
   });
 
   it('is idempotent — rescans add nothing and duplicate nothing', async () => {
-    const root = article('<p>serendipity and petrichor and defenestration</p>');
+    const root = article('<p>serendipity and effulgence and defenestration</p>');
     const tagger = makeTagger();
     await tagger.scan(root);
     const afterFirst = root.querySelectorAll('span.iw-word').length;
@@ -269,18 +272,18 @@ describe('tagger — vocabulary overlay', () => {
   });
 
   it('never tags words marked known or ignored', async () => {
-    const root = article('<p>serendipity, petrichor, and defenestration together.</p>');
+    const root = article('<p>serendipity, effulgence, and defenestration together.</p>');
     const tagger = makeTagger({
-      vocab: vocab({ serendipity: 'known', petrichor: 'ignored' }),
+      vocab: vocab({ serendipity: 'known', effulgence: 'ignored' }),
     });
     await tagger.scan(root);
     expect(lemmasIn(root)).toEqual(['defenestration']);
   });
 
   it('renders learner statuses instead of candidate', async () => {
-    const root = article('<p>serendipity and petrichor</p>');
+    const root = article('<p>serendipity and effulgence</p>');
     const tagger = makeTagger({
-      vocab: vocab({ serendipity: 'unknown', petrichor: 'learning' }),
+      vocab: vocab({ serendipity: 'unknown', effulgence: 'learning' }),
     });
     await tagger.scan(root);
     const byLemma = new Map(
@@ -290,7 +293,7 @@ describe('tagger — vocabulary overlay', () => {
       ]),
     );
     expect(byLemma.get('serendipity')).toBe('unknown');
-    expect(byLemma.get('petrichor')).toBe('learning');
+    expect(byLemma.get('effulgence')).toBe('learning');
   });
 
   it('refreshStatus flips statuses in place without rewrapping', async () => {
@@ -362,5 +365,46 @@ describe('tagger — personal vocabulary overrides the band (bug-2026-11-12-001)
     expect(await tagger.rescan(root)).toBe(1);
     expect(lemmasIn(root)).toEqual(['house']); // exactly one span — nothing double-wrapped
     expect(root.querySelector<HTMLElement>('span.iw-word')?.dataset.iwStatus).toBe('unknown');
+  });
+});
+
+describe('English validation for unlisted words (SBFP-011)', () => {
+  const LEXICON = new Set(['serendipity', 'effulgence', 'gossamer']);
+  const withLexicon = (overrides: Parameters<typeof makeTagger>[0] = {}) =>
+    makeTagger({ ...overrides, ...{ isEnglish: (lemma: string) => LEXICON.has(lemma) } });
+
+  it('unlisted non-English words never tag, in either density', async () => {
+    // NB: surrounding words are synthetic-corpus filler so only the
+    // targets sit in the unlisted tier.
+    const sentence = '<p>The zhiliang of rencai was arigatou, felt like effulgence.</p>';
+    for (const density of ['quiet', 'full'] as const) {
+      const tagger = withLexicon({ settings: { tagDensity: density } });
+      const root = article(sentence);
+      expect(await tagger.scan(root)).toBe(1);
+      expect(lemmasIn(root)).toEqual(['effulgence']);
+    }
+  });
+
+  it('unlisted validated-English words still tag in quiet mode', async () => {
+    const tagger = withLexicon();
+    const root = article('<p>a moment of serendipity</p>');
+    expect(await tagger.scan(root)).toBe(1);
+    expect(lemmasIn(root)).toEqual(['serendipity']);
+  });
+
+  it('personal statuses override the lexicon (learning always shows)', async () => {
+    const tagger = withLexicon({
+      vocab: { statusOf: (lemma) => (lemma === 'zhiliang' ? 'learning' : undefined) },
+    });
+    const root = article('<p>the zhiliang was effulgence</p>');
+    expect(await tagger.scan(root)).toBe(2);
+    expect(lemmasIn(root).sort()).toEqual(['effulgence', 'zhiliang']);
+  });
+
+  it('without the predicate, unlisted words tag as before (fixtures)', async () => {
+    const tagger = makeTagger(); // no isEnglish — legacy behavior
+    const root = article('<p>the zhiliang felt quiet</p>');
+    expect(await tagger.scan(root)).toBe(1);
+    expect(lemmasIn(root)).toEqual(['zhiliang']);
   });
 });

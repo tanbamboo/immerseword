@@ -161,7 +161,7 @@ const SUFFIX_RULES: Array<{ suffix: RegExp; make: (stem: string) => string[] }> 
 /**
  * Conservative fallback rules for rare (unlisted) words — high-precision
  * inflectional suffixes only. A bare -s is deliberately excluded: rare-word
- * plurals ("petrichors") are rarer than wrong stems, and noun endings like
+ * plurals ("effulgences") are rarer than wrong stems, and noun endings like
  * -us/-er/-est ("susurrus", "gossamer", "forest") must never be stripped.
  */
 const FALLBACK_RULES: Array<{

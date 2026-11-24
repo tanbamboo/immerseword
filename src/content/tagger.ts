@@ -113,6 +113,13 @@ export interface TaggerOptions {
   settings: IwSettings;
   vocab?: VocabLike;
   batchSize?: number;
+  /**
+   * SBFP-011: validates unlisted (rank-0) tokens against the bundled
+   * WordNet lexicon. Absent ⇒ unlisted words tag as before (unit-test
+   * fixtures); production always provides it: an unlisted token that is
+   * not validated English is never vocabulary, so never tagged.
+   */
+  isEnglish?: (lemma: string) => boolean;
 }
 
 export function createTagger(options: TaggerOptions) {
@@ -154,8 +161,13 @@ export function createTagger(options: TaggerOptions) {
     // beyond-list tier (rank 0 — words absent from the 20k corpus);
     // 'full' density or the Study pass (3-pass session, pass 2) uses the
     // user's level band. Untagged words stay reachable via dblclick.
+    // SBFP-011: rank 0 must also be validated English — a frequency list
+    // proves nothing about words it doesn't contain (transliterations,
+    // foreign vocabulary, name-like strings would all otherwise tag).
+    const unlisted = options.frequency.rankOf(text) === 0;
+    if (unlisted && options.isEnglish && !options.isEnglish(lemma)) return null;
     const fullBand = settings.tagDensity === 'full' || studyMode;
-    if (fullBand ? !options.frequency.isRarerThan(text, settings.level) : options.frequency.rankOf(text) !== 0) {
+    if (fullBand ? !options.frequency.isRarerThan(text, settings.level) : !unlisted) {
       return null; // within the effective rule → not worth the reader's attention
     }
     return { lemma, status: 'candidate' };

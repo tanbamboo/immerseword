@@ -167,3 +167,18 @@ report's arrival time in session.)*
 > https://developer.chrome.com/webstore/images#icons
 
 
+
+---
+
+## bug-2026-11-24-001 — non-English words tagged as candidates
+
+**Recorded:** 2026-11-24 14:14 +0800
+**Source:** user report (ZCode session)
+**Status:** fixed — PR-37 (`pr/37-english-validation`); see SBFP-011
+
+**Raw report:**
+
+> when I use the extension, even the latest 1.0.1 version, there are too
+> much none English words been tagged. are there any full validated and
+> offline English dictionary to determine if an English word? such as
+> Oxford English Dictionary(OED)?

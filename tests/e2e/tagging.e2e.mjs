@@ -5,7 +5,7 @@
  * lemma-first ranking): every word in #para-common resolves to a lemma
  * inside the default 5k band (stood→stand 1752, ate→eat 2702,
  * talked→talk 790, quiet 4179). #para-rare carries rare words (rank 0 or
- * beyond 5k): serendipity, petrichor, ephemeral, gossamer, tintinnabulation,
+ * beyond 5k): serendipity, effulgence, ephemeral, gossamer, tintinnabulation,
  * faint (15109), dissolve (0). #para-mixed: observe (7565) and
  * reveals→reveal (7098) are rare at 5k; studying→study (484) is NOT.
  */
@@ -40,7 +40,7 @@ export const tests = [
         // Every beyond-corpus word in #para-rare is tagged as a candidate…
         for (const word of [
           'serendipity',
-          'petrichor',
+          'effulgence',
           'ephemeral',
           'gossamer',
           'tintinnabulation',
@@ -74,6 +74,34 @@ export const tests = [
         // Text content is preserved exactly.
         assert.ok(state.paraRareText.includes('serendipity in the air'));
         assert.ok(state.paraRareText.includes('tintinnabulation'));
+
+        // SBFP-011: non-English words are never tagged. Inject a
+        // mixed-language paragraph; the rare-English sentinel proves the
+        // scan reached this node before we assert absences.
+        await page.evaluate(() => {
+          const p = document.createElement('p');
+          p.id = 'para-nonenglish';
+          p.textContent =
+            'The zhiliang of rencai felt arigatou, like danke in the gouli, ' +
+            'a defenestration of meaning.';
+          document.querySelector('article').appendChild(p);
+        });
+        await waitFor(
+          page,
+          () =>
+            document.querySelector('#para-nonenglish span.iw-word[data-lemma="defenestration"]') !==
+            null,
+        );
+        const mixedLemmas = await page.evaluate(() =>
+          [...document.querySelector('#para-nonenglish').querySelectorAll('span.iw-word')].map(
+            (s) => s.dataset.lemma,
+          ),
+        );
+        assert.deepEqual(
+          mixedLemmas,
+          ['defenestration'],
+          `only the validated-English rare word tags, got: ${mixedLemmas}`,
+        );
 
         watcher.assertClean();
         await page.close();
@@ -168,7 +196,7 @@ export const tests = [
           p.id = 'para-links';
           const a = document.createElement('a');
           a.href = 'https://example.com/wonder';
-          a.textContent = 'gossamer wings and petrichor';
+          a.textContent = 'gossamer wings and effulgence';
           p.append('See ', a, ' plus serendipity.');
           document.querySelector('article').appendChild(p);
         });
@@ -186,7 +214,7 @@ export const tests = [
           };
         });
         assert.equal(linkState.spans, 0, 'no tag span may exist inside a link');
-        assert.equal(linkState.text, 'gossamer wings and petrichor');
+        assert.equal(linkState.text, 'gossamer wings and effulgence');
         assert.equal(linkState.href, 'https://example.com/wonder');
         watcher.assertClean();
         await page.close();

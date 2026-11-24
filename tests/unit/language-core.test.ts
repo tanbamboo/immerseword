@@ -97,3 +97,16 @@ describe('frequency index over real bundled data', () => {
     expect(index.isRarerThan('serendipity', '20k')).toBe(true); // absent → rare
   });
 });
+
+describe('bundled English lexicon (SBFP-011)', () => {
+  it('contains the rare-English fixture vocabulary, excludes non-English', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const english = new Set(JSON.parse(await readFile('public/data/english.json', 'utf8')) as string[]);
+    for (const w of ['effulgence', 'gossamer', 'serendipity', 'tintinnabulation', 'defenestration', 'susurrus']) {
+      expect(english.has(w), w).toBe(true);
+    }
+    for (const w of ['zhiliang', 'rencai', 'arigatou', 'danke', 'petrichor']) {
+      expect(english.has(w), w).toBe(false); // petrichor postdates WordNet 3.1
+    }
+  });
+});

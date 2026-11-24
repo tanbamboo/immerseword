@@ -4,8 +4,9 @@
 Top 20,000 English words (Google Trillion Word Corpus) from
 [first20hours/google-10000-english](https://github.com/first20hours/google-10000-english) — MIT License.
 
-## dict-core.json
-Monolingual definitions derived from **WordNet 3.1**,
+## dict-core.json / english.json
+Monolingual definitions and the English-validation lexicon derived from
+**WordNet 3.1**,
 Copyright © 2013 Princeton University. Used under the
 [WordNet License](https://wordnet.princeton.edu/license-and-commercial-use):
 redistribution requires this notice and the license text.
