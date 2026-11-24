@@ -29,3 +29,6 @@ npm-debug.log*
 
 # ZCode session artifacts
 .zcode/
+
+# fast-anything profiler artifacts
+.fast/
