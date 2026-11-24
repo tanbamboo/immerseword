@@ -47,6 +47,12 @@ async function refresh(): Promise<void> {
   (el('#opt-tag-style') as HTMLSelectElement).value = settings.tagStyle;
   (el('#opt-popover-width') as HTMLSelectElement).value = String(settings.popoverWidth);
 
+  const mw = await chrome.storage.local.get(['iw:mwKey']);
+  const mwInput = el('#opt-mw-key') as HTMLInputElement;
+  mwInput.value = '';
+  (el('#opt-mw-status') as HTMLElement).textContent =
+    typeof mw['iw:mwKey'] === 'string' && mw['iw:mwKey'] ? '✓ key saved (tier enabled)' : 'no key saved';
+
   const prefs = await loadReaderPrefs();
   (el('#opt-theme') as HTMLSelectElement).value = prefs.theme;
   (el('#opt-font') as HTMLSelectElement).value = prefs.fontFamily;
@@ -85,6 +91,24 @@ function bindSettings(): void {
       status('Settings saved.');
     });
   }
+
+  // SIP-012: learner's dictionary key — a local credential, never synced
+  // and never part of export/import payloads.
+  el('#opt-mw-save').addEventListener('click', async () => {
+    const key = (el('#opt-mw-key') as HTMLInputElement).value.trim();
+    if (!key) {
+      status('Paste a key first — get one free at dictionaryapi.com.');
+      return;
+    }
+    await chrome.storage.local.set({ 'iw:mwKey': key });
+    status("Learner's dictionary enabled — it answers when the other sources miss.");
+    await refresh();
+  });
+  el('#opt-mw-clear').addEventListener('click', async () => {
+    await chrome.storage.local.remove(['iw:mwKey']);
+    status("Learner's dictionary disabled.");
+    await refresh();
+  });
 
   const readerChange = async (patch: Partial<ReaderPrefs>) => {
     const prefs = { ...(await loadReaderPrefs()), ...patch };

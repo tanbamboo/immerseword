@@ -148,3 +148,19 @@ Analysis and implementation live in [../sip_logs.md](../sip_logs.md).
 > above user's vocabulary. even the extension didn't tag a word, users
 > still can double click to lookup the definition if they want. but if
 > tagged too much, it will distract the attention of user
+
+---
+
+## feat-2026-11-24-002 — learner's-dictionary definitions (Merriam-Webster)
+
+**Recorded:** 2026-11-24 16:56 +0800
+**Source:** user request (ZCode session — direction confirmed: MW Learner's, appended last in the chain)
+**Status:** implemented — PR-38 (`pr/38-learners-dictionary`); see SIP-012
+
+**Raw request:**
+
+> for the word definition, now we support wordNet and dictionaryapi.dev,
+> but sometime I still can't find out the meaning from the definition,
+> even with drill down. is it possible to support some Learner's
+> dictionary, such as Oxford Leaner's dictionary, Cambridge Leaner's
+> dictionary, etc?

@@ -115,4 +115,34 @@ export const tests = [
       });
     },
   },
+  {
+    name: "learner's dictionary key round-trips storage.local (SIP-012)",
+    async run() {
+      await withHarness(async ({ browser }) => {
+        const extensionId = getExtensionId(browser);
+        const page = await openExtensionPage(browser, extensionId, 'options/options.html');
+        await page.waitForSelector('#opt-mw-key', { timeout: 5_000 });
+
+        // Save → stored under iw:mwKey (local, never synced).
+        await page.type('#opt-mw-key', 'e2e-test-key');
+        await page.click('#opt-mw-save');
+        await page.waitForFunction(
+          () => document.querySelector('#opt-mw-status')?.textContent?.includes('✓'),
+          { timeout: 5_000 },
+        );
+        const saved = await page.evaluate(
+          () => new Promise((resolve) => chrome.storage.local.get(['iw:mwKey'], (f) => resolve(f['iw:mwKey']))),
+        );
+        assert.equal(saved, 'e2e-test-key');
+
+        // Remove → cleared.
+        await page.click('#opt-mw-clear');
+        const cleared = await page.evaluate(
+          () => new Promise((resolve) => chrome.storage.local.get(['iw:mwKey'], (f) => resolve(f['iw:mwKey']))),
+        );
+        assert.equal(cleared, undefined);
+        await page.close();
+      });
+    },
+  },
 ];

@@ -65,6 +65,11 @@ const dictionary = createDictionaryService({
     return (await res.json()) as CoreDictionary;
   },
   getSettings: () => getSettings(chrome.storage.sync),
+  // SIP-012: learner's-dictionary key, stored locally ('' = tier disabled).
+  getMwKey: async (): Promise<string> => {
+    const found = await chrome.storage.local.get(['iw:mwKey']);
+    return typeof found['iw:mwKey'] === 'string' ? found['iw:mwKey'] : '';
+  },
 });
 
 const sessions = createSessionService(chrome.storage.session);

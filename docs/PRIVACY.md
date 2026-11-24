@@ -20,6 +20,14 @@ This data never leaves your device through ImmerseWord. If you have Chrome
 Sync enabled, your settings may sync through your own Google account as part
 of Chrome's standard extension-settings sync — we have no access to it.
 
+## The optional learner's dictionary
+
+If you paste a Merriam-Webster API key in Settings, lookups that both the
+offline dictionary and the free dictionary fallback could not answer are
+sent to `api.dictionaryapi.com` (the word and your key, nothing else).
+The key is stored only on this device, never synced, and never included
+in exported data. Remove it any time and this request never happens.
+
 ## The one network request we can make
 
 ImmerseWord bundles an offline dictionary for the most frequent English
