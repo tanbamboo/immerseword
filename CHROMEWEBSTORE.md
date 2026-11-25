@@ -18,7 +18,7 @@ The **store-assigned extension ID differs from the dev ID** (`dlolccjcdeapekdabd
 
 **Known post-publish behavior:** users with Enhanced Safe Browsing see "This extension is not trusted by Enhanced Safe Browsing" on install — standard for every newly published extension whose developer has no store track record yet. It is not a policy flag; users can proceed via "Continue to install", and it fades as installs, ratings, and update history accumulate. No developer-side action exists (see [Google's help page](https://support.google.com/chrome_webstore/answer/2664769)).
 
-**Publishing future versions:** bump `version` in `public/manifest.json` + `package.json` → gates → `npm run package` → upload the new zip in the dashboard (new version row below) → submit. Never hand-zip `dist/` (SBFP-009).
+**Publishing future versions:** the version bump is **maintainer-directed** (never bump automatically — AGENTS.md): on the maintainer's go, bump `version` in `public/manifest.json` + `package.json` → gates → `npm run package` → upload the new zip in the dashboard (new version row below) → submit. Never hand-zip `dist/` (SBFP-009). Interim test builds ship at the current version.
 
 ## Store Listing
 

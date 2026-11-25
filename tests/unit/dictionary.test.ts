@@ -54,13 +54,15 @@ function apiResponse(lemma: string) {
   ];
 }
 
-// SBFP-012: the REAL Learner's JSON shape — senses are tagged tuples in
-// def[].sseq[][], text carries {bc}/{wi} markup, hw has syllable asterisks.
+// The REAL Learner's JSON shape, per the official product page's sample
+// (SBFP-013): `ipa` phonetics, senses as tagged tuples in def[].sseq[][],
+// {it}/{bc} markup, hw with syllable asterisks, top-level shortdef.
 const MW_LEARNERS_FIXTURE = [
   {
-    meta: { id: 'qat', src: 'learners' },
-    hwi: { hw: 'qat', prs: [{ mw: 'ˈkɑːt', sound: { audio: 'qat0001' } }] },
+    meta: { id: 'qat', src: 'learners', stems: ['qat', 'qats'] },
+    hwi: { hw: 'qat', prs: [{ ipa: 'ˈkɑːt', sound: { audio: 'qat0001' } }] },
     fl: 'noun',
+    shortdef: ['a plant whose leaves are chewed as a stimulant'],
     def: [
       {
         sseq: [
@@ -70,8 +72,8 @@ const MW_LEARNERS_FIXTURE = [
               {
                 sn: '1',
                 dt: [
-                  ['text', '{bc}a plant whose leaves are chewed {wi}as a stimulant{/wi}'],
-                  ['vis', [{ t: 'The leaves of the {wi}qat{/wi} plant are chewed.' }]],
+                  ['text', '{bc}a plant whose leaves are chewed {it}as a stimulant{/it}'],
+                  ['vis', [{ t: 'The leaves of the {it}qat{/it} plant are chewed.' }]],
                 ],
               },
             ],
@@ -349,7 +351,14 @@ describe("Merriam-Webster Learner's tier (SIP-012)", () => {
     const { service, storage, fetchCalls } = makeService({ mwKey: 'test-key' });
     const result = await service.lookup('qat');
     expect(fetchCalls.some((u) => u.includes('dictionaryapi.dev'))).toBe(true);
-    expect(fetchCalls.some((u) => u.includes('dictionaryapi.com') && u.includes('key=test-key'))).toBe(true);
+    // SBFP-013: the exact documented host — api.dictionaryapi.com (no www)
+    // silently never answers, so pin the full prefix.
+    expect(
+      fetchCalls.some((u) =>
+        u.startsWith('https://www.dictionaryapi.com/api/v3/references/learners/json/') &&
+        u.includes('key=test-key'),
+      ),
+    ).toBe(true);
     expect(result.source).toBe('mw');
     // Cached: the second lookup makes no network calls at all.
     const again = await service.lookup('qat');

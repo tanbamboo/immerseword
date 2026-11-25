@@ -195,3 +195,18 @@ report's arrival time in session.)*
 
 > there must be something wrong, I always got "The Learner's dictionary
 > has no entry for this word." after click the button for several words.
+
+---
+
+## bug-2026-11-25-003 — Learner's lookups still failing: wrong API host
+
+**Recorded:** 2026-11-25 10:42 +0800
+**Source:** user report (ZCode session — after testing the SBFP-012 build; official doc linked)
+**Status:** fixed — PR-41 (`pr/41-mw-host`); see SBFP-013
+
+**Raw report:**
+
+> still doesn't working, please refer official document at:
+> https://www.dictionaryapi.com/products/api-learners-dictionary.
+> and never automatically bump version number. I will tell you to bump
+> version number manually after I tested the zip.

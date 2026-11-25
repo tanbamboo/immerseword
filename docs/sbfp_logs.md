@@ -580,3 +580,43 @@ merges. Append-only — never rewrite a merged proposal.
   shape (sseq/sense/pseq, {bc}/{wi} markup, suggestion arrays); network
   failures report their own reason and are never cached; the cache
   version bump orphans every poisoned negative entry. v1.0.5 packaged.
+
+---
+
+## SBFP-013 — Learner's requests went to a host the API doesn't serve
+
+- **Reported:** 2026-11-25 (`bug-2026-11-25-003`)
+- **Symptom:** after the SBFP-012 shape fix, on-demand learner's lookups
+  still fail for every word.
+- **Root cause (from the official product page the reporter linked):**
+  the documented endpoint is
+  `https://www.dictionaryapi.com/api/v3/references/learners/json/<word>?key=…`
+  — SIP-012 called **`api.dictionaryapi.com`**, a host the service does
+  not answer on. Unit tests inject the fetcher (URL host never
+  validated) and e2e makes no live calls, so no gate could catch it.
+  Additionally, the Learner's sample shows pronunciations in an `ipa`
+  field (`prs: [{ ipa: "ˈæpəl" }]`), not `mw` — phonetics would have
+  silently dropped even with the right host.
+- **Fix:** request host → `www.dictionaryapi.com`; phonetics read
+  `ipa ?? mw`; the unit fixture rebuilt from the page's "apple" sample
+  (sseq/sense tuples, ipa, {it} markup, shortdef present but unused).
+- **Process changes recorded with this fix (reporter-directed):**
+  1. **Version bumps are manual** — never bump automatically; the
+     maintainer bumps after testing the packaged zip (added to
+     AGENTS.md; this fix ships at 1.0.5, un-bumped).
+  2. External-API URLs and fixtures must come from the vendor's own
+     product/endpoint documentation (this is the second consecutive
+     bug caused by writing them from memory).
+- **Verification plan:** unit — the fetched URL is asserted to start
+  with the documented `https://www.dictionaryapi.com/api/v3/references/
+  learners/json/` prefix (host regressions now fail tests); fixture
+  round-trips the official sample; full gates green.
+- **Risks / edge cases:** none beyond the request itself; cache keys
+  unchanged from SBFP-012.
+- **Outcome:** fixed in PR-41 (`pr/41-mw-host`). Gates: typecheck,
+  unit 176/176, e2e 42/42. The fetched URL prefix is now pinned to the
+  documented `https://www.dictionaryapi.com/api/v3/references/learners/
+  json/` in tests (host regressions fail CI); phonetics read
+  `ipa ?? mw` per the official sample. Version intentionally NOT
+  bumped — maintainer-directed bumps only (AGENTS.md); the test zip
+  remains 1.0.5.
