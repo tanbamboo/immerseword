@@ -27,7 +27,7 @@ export interface PopoverDeps {
    */
   lookupLearners?: (
     lemma: string,
-  ) => Promise<{ entry: DictionaryEntry | null; reason?: 'notfound' | 'rejected' | 'nokey' }>;
+  ) => Promise<{ entry: DictionaryEntry | null; reason?: 'notfound' | 'rejected' | 'nokey' | 'network' }>;
   /** SIP-013: whether a Learner's key is stored — false hides the button. */
   hasLearnersKey?: () => boolean;
 }
@@ -387,14 +387,14 @@ export function createPopover(deps: PopoverDeps) {
     try {
       result = await deps.lookupLearners(currentLemma);
     } catch {
-      result = { entry: null, reason: 'notfound' };
+      result = { entry: null, reason: 'network' };
     }
     btn.remove();
     renderLearnersSection(result);
   }
 
   function renderLearnersSection(
-    result: { entry: DictionaryEntry | null; reason?: 'notfound' | 'rejected' | 'nokey' },
+    result: { entry: DictionaryEntry | null; reason?: 'notfound' | 'rejected' | 'nokey' | 'network' },
   ): void {
     card.querySelector('.learners')?.remove();
     const section = document.createElement('div');
@@ -442,7 +442,9 @@ export function createPopover(deps: PopoverDeps) {
       state.textContent =
         result.reason === 'rejected'
           ? "The Merriam-Webster key was rejected — check the Learner's dictionary section on the options page."
-          : "The Learner's dictionary has no entry for this word.";
+          : result.reason === 'network'
+            ? "Couldn't reach Merriam-Webster — check your connection and try again."
+            : "The Learner's dictionary has no entry for this word.";
       section.append(state);
     }
     // Insert above the personal-examples section if present, else above the status row.

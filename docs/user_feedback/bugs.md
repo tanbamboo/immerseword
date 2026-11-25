@@ -182,3 +182,16 @@ report's arrival time in session.)*
 > much none English words been tagged. are there any full validated and
 > offline English dictionary to determine if an English word? such as
 > Oxford English Dictionary(OED)?
+
+---
+
+## bug-2026-11-25-002 — Learner's button always says "no entry" for real words
+
+**Recorded:** 2026-11-25 09:56 +0800
+**Source:** user report (ZCode session)
+**Status:** fixed — PR-40 (`pr/40-mw-shape`); see SBFP-012
+
+**Raw report:**
+
+> there must be something wrong, I always got "The Learner's dictionary
+> has no entry for this word." after click the button for several words.

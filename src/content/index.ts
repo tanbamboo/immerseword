@@ -134,14 +134,14 @@ async function lookupDefinition(
 /** SIP-013: on-demand Learner's lookup for the popover's "still don't understand" action. */
 async function lookupLearnersDefinition(
   lemma: string,
-): Promise<{ entry: import('../shared/types').DictionaryEntry | null; reason?: 'notfound' | 'rejected' | 'nokey' }> {
+): Promise<{ entry: import('../shared/types').DictionaryEntry | null; reason?: 'notfound' | 'rejected' | 'nokey' | 'network' }> {
   const response = (await chrome.runtime.sendMessage({
     type: 'DICT_LOOKUP_LEARNERS',
     lemma,
   })) as {
     type?: string;
     entry?: import('../shared/types').DictionaryEntry | null;
-    reason?: 'notfound' | 'rejected' | 'nokey';
+    reason?: 'notfound' | 'rejected' | 'nokey' | 'network';
   };
   return { entry: response?.entry ?? null, reason: response?.reason };
 }

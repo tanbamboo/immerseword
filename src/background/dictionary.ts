@@ -28,7 +28,16 @@ const POS_LABEL: Record<string, string> = {
   r: 'adverb',
 };
 
-export type DictSource = 'core' | 'api' | 'mw' | 'cache' | 'error' | 'none';
+export type DictSource = 'core' | 'api' | 'mw' | 'cache' | 'error' | 'network' | 'none';
+
+/** Why an on-demand learner's lookup has no entry (SIP-013, SBFP-012). */
+export type LearnersReason = 'notfound' | 'rejected' | 'nokey' | 'network';
+
+function learnersReasonOf(source: DictSource): LearnersReason {
+  if (source === 'error') return 'rejected'; // HTTP 401/403: key refused
+  if (source === 'network') return 'network'; // fetch threw / timed out
+  return 'notfound';
+}
 
 export interface LookupResult {
   lemma: string;
@@ -49,7 +58,9 @@ export interface FetchLike {
   }>;
 }
 
-const CACHE_KEY = 'iw:dictCache';
+// v2 (SBFP-012): the v1 cache holds 7-day negative entries written by the
+// broken MW normalizer — the bump orphans them; caches refill on demand.
+const CACHE_KEY = 'iw:dictCache2';
 const CACHE_CAP = 2_000;
 const CACHE_PRUNE = 400; // dropped from the oldest end when cap is exceeded
 const NEGATIVE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -175,8 +186,11 @@ export function createDictionaryService(deps: DictionaryDeps) {
       }
       await writeCache(cacheKey, { e: entry });
       return { lemma, entry, source: 'mw' };
-    } catch {
-      return { lemma, entry: null, source: 'none' };
+    } catch (err) {
+      // Network unavailable / timeout (SBFP-012): never cached, and the
+      // caller can tell it apart from a miss and from an auth refusal.
+      console.warn('[ImmerseWord] Merriam-Webster Learner\'s request failed:', err);
+      return { lemma, entry: null, source: 'network' };
     }
   }
 
@@ -189,7 +203,7 @@ export function createDictionaryService(deps: DictionaryDeps) {
      */
     async lookupLearners(
       rawLemma: string,
-    ): Promise<{ entry: DictionaryEntry | null; reason?: 'notfound' | 'rejected' | 'nokey' }> {
+    ): Promise<{ entry: DictionaryEntry | null; reason?: LearnersReason }> {
       const surface = rawLemma.toLowerCase().trim();
       if (!surface) return { entry: null, reason: 'notfound' };
       const key = (await deps.getMwKey()).trim();
@@ -199,7 +213,7 @@ export function createDictionaryService(deps: DictionaryDeps) {
       if (cached) return cached.entry ? { entry: cached.entry } : { entry: null, reason: 'notfound' };
       const result = await fromMwLearners(surface, key, cacheKey);
       if (result.entry) return { entry: result.entry };
-      return { entry: null, reason: result.source === 'error' ? 'rejected' : 'notfound' };
+      return { entry: null, reason: learnersReasonOf(result.source) };
     },
 
     async lookup(rawLemma: string): Promise<LookupResult> {
@@ -297,45 +311,60 @@ export function normalizeApiEntry(lemma: string, body: unknown): DictionaryEntry
 }
 
 /**
- * SIP-012: maps a Merriam-Webster Learner's v3 JSON response (array) to
- * our DictionaryEntry. Shape (abridged): entries[0] carries
- * `hwi.hw` (headword), `hwi.prs[0].mw` (pronunciation), `fl` (functional
- * label = part of speech), `def[].senses[].dt` — a list of typed items
- * where ["text", …] is the definition and ["vis", [{t}]] holds examples.
+ * SIP-012: maps a Merriam-Webster Learner's JSON response (array) to our
+ * DictionaryEntry. Real shape (per dictionaryapi.com's JSON structure
+ * reference, SBFP-012): entries[0] carries `hwi.prs[0].mw` (phonetics)
+ * and `fl` (part of speech); senses are TAGGED TUPLES inside
+ * `def[].sseq[][]` — `["sense", { sn, dt }]`, sometimes wrapped in
+ * `["pseq", [ …sense tuples… ]]`. `dt` items are tagged: `["text", …]`
+ * is the definition, `["vis", [{ t }]]` the examples. Text may carry
+ * `{bc}`/`{it}`/`{wi}` markup, which is stripped.
  */
 export function normalizeMwLearnersEntry(lemma: string, body: unknown): DictionaryEntry | null {
   if (!Array.isArray(body) || body.length === 0) return null;
   const first = body[0] as {
     hwi?: { hw?: string; prs?: Array<{ mw?: string }> };
     fl?: string;
-    def?: Array<{
-      fl?: string;
-      senses?: Array<{
-        dt?: Array<[string, unknown]>;
-      }>;
-    }>;
+    def?: Array<{ sseq?: unknown[][] }>;
   };
-  if (!first.def?.length) return null;
+  if (!first.def?.length) return null; // miss: MW suggests words as a string array
+
+  const clean = (text: string): string => text.replace(/\{[^}]*\}/g, ' ').replace(/\s+/g, ' ').trim();
 
   const phonetic = first.hwi?.prs?.map((p) => p.mw).find((t) => !!t && t.length > 0);
   const senses: DictionarySense[] = [];
+
+  const senseFromTuple = (senseObj: { dt?: Array<[string, unknown]> }): void => {
+    const dt = senseObj.dt ?? [];
+    const textItem = dt.find(([tag]) => tag === 'text');
+    if (!textItem || typeof textItem[1] !== 'string' || !textItem[1].trim()) return;
+    const definition = clean(textItem[1]);
+    if (!definition) return;
+    const senseEntry: DictionarySense = { partOfSpeech: first.fl, definition };
+    const visItem = dt.find(([tag]) => tag === 'vis');
+    const example = Array.isArray(visItem?.[1])
+      ? ((visItem[1] as Array<{ t?: string }>)[0]?.t ?? undefined)
+      : undefined;
+    if (example) senseEntry.example = clean(example);
+    senses.push(senseEntry);
+  };
+
   outer: for (const defGroup of first.def) {
-    const partOfSpeech = defGroup.fl ?? first.fl;
-    for (const sense of defGroup.senses ?? []) {
-      const dt = sense.dt ?? [];
-      const textItem = dt.find(([tag]) => tag === 'text');
-      if (!textItem || typeof textItem[1] !== 'string' || !textItem[1].trim()) continue;
-      const senseEntry: DictionarySense = {
-        partOfSpeech,
-        definition: textItem[1].replace(/\s*\{[^}]*\}\s*/g, ' ').replace(/\s+/g, ' ').trim(),
-      };
-      const visItem = dt.find(([tag]) => tag === 'vis');
-      const example = Array.isArray(visItem?.[1])
-        ? ((visItem[1] as Array<{ t?: string }>)[0]?.t ?? undefined)
-        : undefined;
-      if (example) senseEntry.example = example.replace(/\s+/g, ' ').trim();
-      senses.push(senseEntry);
-      if (senses.length >= 3) break outer;
+    for (const seq of defGroup.sseq ?? []) {
+      for (const tuple of seq ?? []) {
+        if (!Array.isArray(tuple) || tuple.length < 2) continue;
+        if (tuple[0] === 'sense') {
+          senseFromTuple(tuple[1] as { dt?: Array<[string, unknown]> });
+        } else if (tuple[0] === 'pseq') {
+          // parenthesized sense sequence: its payload is an array of tuples
+          for (const inner of (tuple[1] as unknown[]) ?? []) {
+            if (Array.isArray(inner) && inner[0] === 'sense') {
+              senseFromTuple(inner[1] as { dt?: Array<[string, unknown]> });
+            }
+          }
+        } // "sen"/"bs"/"ri"… carry no plain dt text — skipped
+        if (senses.length >= 3) break outer;
+      }
     }
   }
   if (senses.length === 0) return null;
