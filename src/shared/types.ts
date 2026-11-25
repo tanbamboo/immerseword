@@ -34,7 +34,7 @@ export type IwMessage =
       type: 'DICT_RESULT_LEARNERS';
       lemma: string;
       entry: DictionaryEntry | null;
-      reason?: 'notfound' | 'rejected' | 'nokey';
+      reason?: 'notfound' | 'rejected' | 'nokey' | 'network';
     }
   | { type: 'IW_SHOW_LOOKUP'; lemma: string }
   | { type: 'GET_PAGE_DATA' }

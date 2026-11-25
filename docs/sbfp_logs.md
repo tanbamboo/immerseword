@@ -533,3 +533,50 @@ merges. Append-only — never rewrite a merged proposal.
   77,561 lemmas / 0.86 MB; store zip 1.0.2 = 961 KB. One consequence
   recorded: "petrichor" postdates WordNet 3.1 and is now untagged — the
   fixture vocabulary swapped it for "effulgence" (WordNet ✓ rank 0 ✓).
+
+---
+
+## SBFP-012 — Learner's lookups fail on every real word: normalizer built from an invented shape
+
+- **Reported:** 2026-11-25 (`bug-2026-11-25-002`)
+- **Symptom:** tapping "Still don't understand?" always yields "The
+  Learner's dictionary has no entry for this word." — for words the
+  dictionary certainly has.
+- **Root cause (verified against MW's official JSON structure docs):**
+  the real Learner's response nests senses as **tagged tuples** —
+  `def[].sseq[][] → ["sense", { sn, dt: [["text", …], ["vis", […]] }] ]`,
+  with `pseq`/`sen` variants. `normalizeMwLearnersEntry` (SIP-012) was
+  written against a hand-invented fixture using `def[].senses[]` — a key
+  that does not exist in real responses. Every real entry parsed to
+  `null`, was treated as a miss, and was **negative-cached for 7 days**
+  (`mw:<lemma>`), making the failure look permanent. Compounding it,
+  fetch throws (network/timeout) also mapped to the same "no entry"
+  message, hiding connectivity causes behind a false claim.
+- **Evidence:** dictionaryapi.com JSON structure reference (sseq/sense
+  tuples, `{bc}`/`{it}` markers, `hwi.hw` asterisks); the unit fixture
+  `MW_LEARNERS_FIXTURE` in dictionary.test.ts — invented, passing.
+- **Fix:**
+  - Normalizer walks the real shape: `def[].sseq[]`, handling `sense`
+    tuples (and `sense` inside `pseq`), skipping `sen`/`bs`; part of
+    speech from the top-level `fl`; `{bc}` and other `{…}` markup
+    stripped from text and examples.
+  - New `network` reason for fetch throws/timeout (never negative
+    cached; SW console warns) with its own popover message; `notfound`
+    reserved for genuine misses.
+  - **Cache version bump** (`iw:dictCache` → `iw:dictCache2`): the 7-day
+    negative entries written by the broken normalizer must not survive
+    the fix.
+  - Unit fixtures replaced with the documented real shape (+ pseq and
+    `{bc}` cases); the invented SIP-012 fixture removed.
+- **Verification plan:** unit — real-shape fixture parses (senses,
+  examples, phonetics, POS); pseq nesting; marker cleanup; network-throw
+    → reason `network` without negative caching; genuine miss →
+    `notfound` + cached. Full gates green.
+- **Risks / edge cases:** exotic sense constructs (`bs`, `ri`, `snote`)
+  are skipped rather than rendered — fewer senses, never wrong ones;
+  existing users' caches reset once (refill on demand).
+- **Outcome:** fixed in PR-40 (`pr/40-mw-shape`). Gates: typecheck,
+  unit 176/176, e2e 42/42. Fixtures replaced with the documented real
+  shape (sseq/sense/pseq, {bc}/{wi} markup, suggestion arrays); network
+  failures report their own reason and are never cached; the cache
+  version bump orphans every poisoned negative entry. v1.0.5 packaged.

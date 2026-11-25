@@ -54,21 +54,42 @@ function apiResponse(lemma: string) {
   ];
 }
 
+// SBFP-012: the REAL Learner's JSON shape — senses are tagged tuples in
+// def[].sseq[][], text carries {bc}/{wi} markup, hw has syllable asterisks.
 const MW_LEARNERS_FIXTURE = [
   {
-    meta: { id: 'qat' },
-    hwi: { hw: 'qat', prs: [{ mw: 'ˈkɑːt' }] },
+    meta: { id: 'qat', src: 'learners' },
+    hwi: { hw: 'qat', prs: [{ mw: 'ˈkɑːt', sound: { audio: 'qat0001' } }] },
     fl: 'noun',
     def: [
       {
-        fl: 'noun',
-        senses: [
-          {
-            dt: [
-              ['text', 'a plant whose leaves are chewed {it}as a stimulant{/it}'],
-              ['vis', [{ t: 'The leaves of the qat plant are chewed.' }]],
+        sseq: [
+          [
+            [
+              'sense',
+              {
+                sn: '1',
+                dt: [
+                  ['text', '{bc}a plant whose leaves are chewed {wi}as a stimulant{/wi}'],
+                  ['vis', [{ t: 'The leaves of the {wi}qat{/wi} plant are chewed.' }]],
+                ],
+              },
             ],
-          },
+            ['sen', { sn: '2' }], // truncated sense — no dt, must be skipped
+            // pseq is a TUPLE inside the sequence, wrapping its own senses
+            [
+              'pseq',
+              [
+                [
+                  'sense',
+                  {
+                    sn: '3a',
+                    dt: [['text', '{bc}the leaves of this plant']],
+                  },
+                ],
+              ],
+            ],
+          ],
         ],
       },
     ],
@@ -235,7 +256,7 @@ describe('dictionary cache — LRU pruning', () => {
     for (let i = 0; i < 2_050; i++) {
       await service.lookup(`w${i}q`); // 404 → negative cache entries
     }
-    const cache = storage.dump().get('iw:dictCache') as Record<string, unknown>;
+    const cache = storage.dump().get('iw:dictCache2') as Record<string, unknown>;
     expect(Object.keys(cache).length).toBe(1_650); // 2050 − 400 pruned
     expect(cache['w0q']).toBeUndefined(); // oldest gone
     expect(cache['w2049q']).toBeDefined(); // newest kept
@@ -306,40 +327,22 @@ describe('synonyms (SIP-005)', () => {
 });
 
 describe("Merriam-Webster Learner's tier (SIP-012)", () => {
-  const MW_BODY = [
-    {
-      meta: { id: 'copiously' },
-      hwi: { hw: 'copiously', prs: [{ mw: 'ˈkoʊ-pi-əs-li', sound: { audio: 'copio01' } }] },
-      fl: 'adverb',
-      def: [
-        {
-          fl: 'adverb',
-          senses: [
-            {
-              dt: [
-                ['text', 'in large amounts {it}rained copiously{/it}'],
-                ['vis', [{ t: 'He wrote copiously on the subject.' }]],
-              ],
-            },
-          ],
-        },
-      ],
-    },
-  ];
-
-  it('normalizes the MW learners shape: phonetics, POS, sense, example', () => {
-    const entry = normalizeMwLearnersEntry('copiously', MW_BODY);
-    expect(entry?.lemma).toBe('copiously');
-    expect(entry?.phonetic).toBe('/ˈkoʊ-pi-əs-li/');
-    expect(entry?.senses).toHaveLength(1);
-    expect(entry?.senses[0]?.partOfSpeech).toBe('adverb');
-    expect(entry?.senses[0]?.definition).toBe('in large amounts rained copiously');
-    expect(entry?.senses[0]?.example).toBe('He wrote copiously on the subject.');
+  it('normalizes the REAL shape (SBFP-012): sseq tuples, pseq, markup, sen skipped', () => {
+    const entry = normalizeMwLearnersEntry('qat', MW_LEARNERS_FIXTURE);
+    expect(entry?.lemma).toBe('qat');
+    expect(entry?.phonetic).toBe('/ˈkɑːt/');
+    expect(entry?.senses).toHaveLength(2); // sense + pseq-wrapped sense; sen skipped
+    expect(entry?.senses[0]?.partOfSpeech).toBe('noun'); // from top-level fl
+    expect(entry?.senses[0]?.definition).toBe('a plant whose leaves are chewed as a stimulant');
+    expect(entry?.senses[0]?.example).toBe('The leaves of the qat plant are chewed.');
+    expect(entry?.senses[1]?.definition).toBe('the leaves of this plant');
   });
 
-  it('returns null for empty or malformed bodies', () => {
+  it('returns null for empty or malformed bodies, and for suggestion arrays', () => {
     expect(normalizeMwLearnersEntry('x', [])).toBeNull();
     expect(normalizeMwLearnersEntry('x', [{ meta: { id: 'x' } }])).toBeNull();
+    // MW suggests similar words as a plain string array — not an entry.
+    expect(normalizeMwLearnersEntry('x', ['qat', 'quad'])).toBeNull();
   });
 
   it('answers last: only after core miss, cache miss, and dev miss', async () => {
@@ -348,7 +351,6 @@ describe("Merriam-Webster Learner's tier (SIP-012)", () => {
     expect(fetchCalls.some((u) => u.includes('dictionaryapi.dev'))).toBe(true);
     expect(fetchCalls.some((u) => u.includes('dictionaryapi.com') && u.includes('key=test-key'))).toBe(true);
     expect(result.source).toBe('mw');
-    expect(result.entry?.senses[0]?.definition).toBe('a plant whose leaves are chewed as a stimulant');
     // Cached: the second lookup makes no network calls at all.
     const again = await service.lookup('qat');
     expect(again.source).toBe('cache');
@@ -387,6 +389,25 @@ describe("on-demand lookupLearners (SIP-013)", () => {
     // own cache key) → answers 'mw' via a second network call.
     const chain = await service.lookup('qat');
     expect(chain.source).toBe('mw');
+  });
+
+  it('a network failure reports network and is never negative-cached (SBFP-012)', async () => {
+    const storage = fakeStorage();
+    let down = true;
+    const service = createDictionaryService({
+      fetchImpl: (async () => {
+        if (down) throw new Error('offline');
+        return { ok: false, status: 404, json: async () => ({}) };
+      }) as never,
+      storage,
+      loadCore: async () => null,
+      getSettings: async () => DEFAULT_SETTINGS,
+      getMwKey: async () => 'k',
+    });
+    expect((await service.lookupLearners('qat')).reason).toBe('network');
+    // Recovery: once the network is back, the same word fetches afresh.
+    down = false;
+    expect((await service.lookupLearners('qat')).reason).toBe('notfound');
   });
 
   it('404 → notfound; 403 → rejected; no key → nokey without fetching', async () => {
