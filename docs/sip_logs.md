@@ -610,3 +610,27 @@ PR merges. Append-only — never rewrite a merged proposal.
   ship: the button originally rendered with no key configured (a dead
   button) — now gated on key presence, tracked live via storage.onChanged.
   v1.0.4 packaged (964 KB).
+
+---
+
+## SIP-014 — learner's block moves under the definitions; "More ⌄" affordance
+
+- **Requested:** 2026-11-25 (`feat-2026-11-25-004`)
+- **Motivation:** the full-width "Still don't understand? …" button was
+  visually loud, and the expanded section rendered below the synonyms
+  row — the reporter wants the learner's content directly attached to
+  the definition block it clarifies, before "Recently met".
+- **Scope:** presentation-only ordering/restyle in the popover —
+  - the affordance becomes a small right-aligned "More ⌄" text button
+    at the bottom-right of the definition block (tooltip keeps the full
+    intent: "Show the Learner's dictionary definition");
+  - the expanded Learner's section renders directly below the
+    definitions — above the synonyms row and "Recently met";
+  - no behavior, chain, or data changes.
+- **Test plan:** existing popover unit tests updated for the new label
+  and the new ordering (learners section before the synonyms row);
+  gates green; no new e2e (CSS/order only).
+- **Risks:** none — same data and click semantics.
+- **Outcome:** implemented in PR-42 (`pr/42-learners-placement`).
+  Gates: typecheck, unit 176/176, e2e 42/42. Version intentionally NOT
+  bumped (maintainer-directed); test zip rebuilt at 1.0.5.

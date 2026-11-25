@@ -116,13 +116,13 @@ const STYLE = `
     font-size: 12px; color: #616e7c; padding: 2px 6px; border-radius: 6px;
   }
   .back:hover { background: #efece4; color: #1f2933; }
-  /* SIP-013: on-demand Learner's dictionary section. */
+  /* SIP-014: small right-aligned "More ⌄" at the bottom of the definition block. */
   .learners-btn {
-    display: block; width: 100%; margin-top: 10px; padding: 7px 0;
-    border: 1px dashed #c7d2fe; background: #f8faff; color: #4338ca;
-    border-radius: 8px; font-size: 12px; cursor: pointer; text-align: center;
+    display: block; margin: 2px 0 0 auto; padding: 2px 4px;
+    border: 0; background: transparent; color: #616e7c;
+    font-size: 12px; cursor: pointer;
   }
-  .learners-btn:hover { background: #eef2ff; border-color: #4f46e5; }
+  .learners-btn:hover { color: #4f46e5; text-decoration: underline; }
   .learners-btn:disabled { color: #9aa5b1; cursor: default; }
   .learners { margin-top: 10px; border-top: 1px dashed #ece8df; padding-top: 8px; }
   .learners-h {
@@ -374,7 +374,8 @@ export function createPopover(deps: PopoverDeps) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'learners-btn';
-    btn.textContent = "Still don't understand? Show the Learner's dictionary definition";
+    btn.textContent = 'More \u2304'; // small chevron-down affordance (SIP-014)
+    btn.title = "Still don't understand? Show the Learner's dictionary definition";
     btn.addEventListener('click', () => void onLearnersClick(btn));
     return btn;
   }
@@ -447,8 +448,13 @@ export function createPopover(deps: PopoverDeps) {
             : "The Learner's dictionary has no entry for this word.";
       section.append(state);
     }
-    // Insert above the personal-examples section if present, else above the status row.
-    card.querySelector('.met')?.before(section) ?? card.querySelector('.status-row')?.before(section) ?? card.append(section);
+    // SIP-014: directly below the definition block — above the synonyms
+    // row, "Recently met", and the status row (whichever follows).
+    (
+      card.querySelector('.syn') ??
+      card.querySelector('.met') ??
+      card.querySelector('.status-row')
+    )?.before(section) ?? card.append(section);
   }
 
   function renderEntry(lemma: string, entry: DictionaryEntry, source: string, vocabEntry?: VocabEntry): void {
@@ -488,15 +494,16 @@ export function createPopover(deps: PopoverDeps) {
       card.append(wrap);
     }
 
-    if (entry.synonyms?.length) {
-      card.append(synonymsSection(entry.synonyms));
-    }
-
-    // SIP-013: offer the learner's definition when it could differ from
-    // what's shown — not when this entry already IS the learner's answer,
-    // and not without a configured key (a dead button teaches nothing).
+    // SIP-014: the "More ⌄" affordance closes the definition block,
+    // above the synonyms row. It appears only when the learner's
+    // definition could differ from what's shown — not when this entry
+    // already IS the learner's answer, and not without a configured key.
     if (deps.lookupLearners && (deps.hasLearnersKey?.() ?? true) && source !== 'mw') {
       card.append(learnersButton());
+    }
+
+    if (entry.synonyms?.length) {
+      card.append(synonymsSection(entry.synonyms));
     }
 
     if (vocabEntry?.examples?.length) {

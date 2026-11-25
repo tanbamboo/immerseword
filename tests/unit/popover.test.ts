@@ -518,7 +518,8 @@ describe("Learner's dictionary button + section (SIP-013)", () => {
   it('renders the button when the dep exists and the entry is not from MW', async () => {
     const { popover } = makeWithLearners({ entry: MW_ENTRY });
     await popover.openFor(null, 'observe');
-    expect(popover._card.querySelector('.learners-btn')?.textContent).toContain("Still don't understand");
+    expect(popover._card.querySelector('.learners-btn')?.textContent).toContain('More');
+    expect(popover._card.querySelector('.learners-btn')?.textContent).toContain('\u2304');
     popover.close();
   });
 
@@ -565,6 +566,13 @@ describe("Learner's dictionary button + section (SIP-013)", () => {
     expect(lookupLearners).toHaveBeenCalledWith('observe');
     expect(popover._card.querySelector('.learners-head')?.textContent).toContain('observe');
     expect(popover._card.querySelector('.learners .def')?.textContent).toContain('watch and listen');
+    // SIP-014: the expanded section renders directly below the definition
+    // block — ahead of the synonyms row when one exists.
+    const cardChildren = [...popover._card.children];
+    const learnersAt = cardChildren.findIndex((n) => n.classList.contains('learners'));
+    const synAt = cardChildren.findIndex((n) => n.classList.contains('syn'));
+    if (synAt !== -1) expect(learnersAt).toBeLessThan(synAt);
+    expect(learnersAt).toBeGreaterThan(cardChildren.findIndex((n) => n.classList.contains('sense')));
     // Original definition still on top; button replaced by the section.
     expect(popover._card.querySelector('.learners-btn')).toBeNull();
     expect(popover._card.querySelector('.def')?.textContent).toContain('discover or determine');
