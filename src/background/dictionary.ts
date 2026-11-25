@@ -171,7 +171,8 @@ export function createDictionaryService(deps: DictionaryDeps) {
   async function fromMwLearners(lemma: string, key: string, cacheKey = lemma): Promise<LookupResult> {
     try {
       const res = await deps.fetchImpl(
-        `https://api.dictionaryapi.com/api/v3/references/learners/json/${encodeURIComponent(lemma)}?key=${encodeURIComponent(key)}`,
+        // Host per the official product page (SBFP-013): www.dictionaryapi.com.
+        `https://www.dictionaryapi.com/api/v3/references/learners/json/${encodeURIComponent(lemma)}?key=${encodeURIComponent(key)}`,
         { signal: AbortSignal.timeout(8_000) },
       );
       if (!res.ok) {
@@ -323,7 +324,7 @@ export function normalizeApiEntry(lemma: string, body: unknown): DictionaryEntry
 export function normalizeMwLearnersEntry(lemma: string, body: unknown): DictionaryEntry | null {
   if (!Array.isArray(body) || body.length === 0) return null;
   const first = body[0] as {
-    hwi?: { hw?: string; prs?: Array<{ mw?: string }> };
+    hwi?: { hw?: string; prs?: Array<{ mw?: string; ipa?: string }> };
     fl?: string;
     def?: Array<{ sseq?: unknown[][] }>;
   };
@@ -331,7 +332,11 @@ export function normalizeMwLearnersEntry(lemma: string, body: unknown): Dictiona
 
   const clean = (text: string): string => text.replace(/\{[^}]*\}/g, ' ').replace(/\s+/g, ' ').trim();
 
-  const phonetic = first.hwi?.prs?.map((p) => p.mw).find((t) => !!t && t.length > 0);
+  // Learner's pronunciations carry `ipa` (per the official sample);
+  // `mw` covers the collegiate-style shape — accept either.
+  const phonetic = first.hwi?.prs
+    ?.map((p) => p.ipa ?? p.mw)
+    .find((t) => !!t && t.length > 0);
   const senses: DictionarySense[] = [];
 
   const senseFromTuple = (senseObj: { dt?: Array<[string, unknown]> }): void => {

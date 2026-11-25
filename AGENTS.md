@@ -56,3 +56,15 @@ When the user requests a new feature:
 4. **Implement** on its own `pr/NN-slug` branch and deliver via PR (per the
    branching rule above); append the outcome to the SIP entry when the PR
    merges.
+
+## Releases & external APIs
+
+- **Version bumps are manual**: never bump the extension/package version
+  on your own. Produce the packaged zip at the current version; the
+  maintainer tests it and says when to bump for the Chrome Web Store.
+- **External-API details come from the vendor's own documentation** —
+  endpoint URLs, hosts, and response fixtures are copied from the
+  official product pages (or recorded live responses), never written
+  from memory. Two shipped bugs (SBFP-012, SBFP-013) came from invented
+  shapes and a wrong host that no test could catch because the fetcher
+  was faked — pin the documented URL prefix in tests.
