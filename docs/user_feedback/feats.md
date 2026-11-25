@@ -179,3 +179,20 @@ Analysis and implementation live in [../sip_logs.md](../sip_logs.md).
 > "I still don't understand, show me the definition from Learner's
 > dictionary" in the popover window, and then a new section to display
 > the definition from Learner's dictionary.
+
+---
+
+## feat-2026-11-25-004 — Learner's section placement + "More ⌄" button restyle
+
+**Recorded:** 2026-11-25 14:08 +0800
+**Source:** user request (ZCode session — after confirming SBFP-013 works)
+**Status:** implemented — PR-42 (`pr/42-learners-placement`); see SIP-014
+
+**Raw request:**
+
+> it works now, but there are something to improve: 1, the
+> Merriam-Webster Leaner's dictionary section should just below Offline
+> WordNet and dictionaryapi.dev, and before "Recently met" section. 2,
+> the button "still don't understand ..." is too ugly, change to
+> "More >>(arrow toward down)", at the bottom right of the "definition
+> section" of popover window.
