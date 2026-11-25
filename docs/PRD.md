@@ -110,13 +110,14 @@ pedagogically sound.
     candidates, synonym words, or a double-click on any word in the card)
     open the new entry over the original; "‹ Back" returns instantly to
     the entry underneath
-  - **"More ⌄" action** (SIP-013/014): when a Learner's dictionary key
-    is configured and the shown entry is not already the learner's
-    answer, a small right-aligned "More ⌄" affordance closes the
-    definition block; tapping it fetches the Merriam-Webster Learner's
-    definition on demand, rendered directly below the definitions and
-    above the synonyms/"Recently met" rows (cached per word; nothing
-    changes automatically)
+  - **simultaneous dictionary sources** (SIP-013→015): when a Learner's
+    dictionary key is configured and the shown entry is not already the
+    learner's answer, a "Learner's dictionary · Merriam-Webster" section
+    mounts **directly below the definitions** (above synonyms /
+    "Recently met") and fills automatically from the cached lookup —
+    Apple-Dictionary-style stacked sources, no click needed. Misses and
+    network hiccups hide the section; a rejected key stays visible with
+    its message
   - **Synonyms row** (SIP-005): up to 8 same-synset words from the bundled
     WordNet data (or the API fallback), shown as plain inline words —
     hover underlines; tapping a word looks it up — English-only thesaurus

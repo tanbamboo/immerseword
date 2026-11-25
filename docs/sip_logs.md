@@ -634,3 +634,53 @@ PR merges. Append-only — never rewrite a merged proposal.
 - **Outcome:** implemented in PR-42 (`pr/42-learners-placement`).
   Gates: typecheck, unit 176/176, e2e 42/42. Version intentionally NOT
   bumped (maintainer-directed); test zip rebuilt at 1.0.5.
+
+---
+
+## SIP-015 — simultaneous dictionary sources (Apple-Dictionary style)
+
+- **Requested:** 2026-11-25 (`feat-2026-11-25-005`)
+- **Motivation:** two things. (a) SIP-014's placement never took effect:
+  the insertion used `node.before(section) ?? card.append(section)`, and
+  since `.before()` returns undefined, the fallback appended a DUPLICATE
+  at the card bottom — the reporter kept seeing the misplaced copy.
+  (b) The reporter proposes the better model, per Apple's Dictionary
+  app: show all sources for a word at once, stacked — no extra click.
+- **Scope:** when a Learner's key is configured and the shown entry is
+  not already the learner's answer, the popover mounts a
+  "Learner's dictionary · Merriam-Webster" section **directly below the
+  definitions** (above synonyms / "Recently met") at render time, in a
+  "Looking up…" state; it fills from the (namespaced, cached) lookup
+  when that resolves and removes itself on a miss or network failure —
+  key-rejected stays visible (actionable). The "More ⌄" button flow is
+  removed entirely: no click, sources simply coexist.
+- **UX sketch (Apple-like, stacked in one card):**
+  ```
+  observe /əbˈzɜːrv/  ✕
+  [definitions — offline core / dictionaryapi.dev]
+  Learner's dictionary · Merriam-Webster
+    verb  to watch and listen carefully …
+  Synonyms …
+  Recently met …
+  ```
+- **Technical approach:** the section mounts during renderEntry (right
+  after the sense loop — natural DOM order, no querySelector insertion,
+  so the `.before() ?? append` bug class disappears); async fill is
+  guarded by the lookup sequence counter; one cached MW request per
+  distinct word while a key is set (quota-bounded by the user's own
+  curiosity, as before).
+- **Test plan:** unit — section mounts and fills after openFor (waitFor);
+  miss/network → section removes itself; rejected → message stays; no
+  key → no section and no fetch; source 'mw' → no duplicate section.
+  e2e — no key → no section; with a stored key → section header appears
+  (placeholder state; no network assertions in tests).
+- **Risks:** first-ever lookup per word adds a network round-trip before
+  the learner's senses appear (the main definition renders instantly —
+  the section streams in); quota consumption equals one request per
+  distinct word per cache lifetime.
+- **Docs:** PRD F2 bullet rewritten (SIP-013/014 history noted).
+- **Outcome:** implemented in PR-43 (`pr/43-simultaneous-sources`).
+  Gates: typecheck, unit 176/176, e2e 42/42. The `.before() ?? append`
+  duplicate-insertion bug is gone with the code path itself — the
+  section now mounts in natural DOM order. Version intentionally NOT
+  bumped; test zip rebuilt at 1.0.5.

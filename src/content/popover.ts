@@ -116,14 +116,6 @@ const STYLE = `
     font-size: 12px; color: #616e7c; padding: 2px 6px; border-radius: 6px;
   }
   .back:hover { background: #efece4; color: #1f2933; }
-  /* SIP-014: small right-aligned "More ⌄" at the bottom of the definition block. */
-  .learners-btn {
-    display: block; margin: 2px 0 0 auto; padding: 2px 4px;
-    border: 0; background: transparent; color: #616e7c;
-    font-size: 12px; cursor: pointer;
-  }
-  .learners-btn:hover { color: #4f46e5; text-decoration: underline; }
-  .learners-btn:disabled { color: #9aa5b1; cursor: default; }
   .learners { margin-top: 10px; border-top: 1px dashed #ece8df; padding-top: 8px; }
   .learners-h {
     font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
@@ -369,43 +361,48 @@ export function createPopover(deps: PopoverDeps) {
       : token.toLowerCase() === headword;
   }
 
-  /** SIP-013: the "still don't understand" action — fetch and render the Learner's entry below. */
-  function learnersButton(): HTMLButtonElement {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'learners-btn';
-    btn.textContent = 'More \u2304'; // small chevron-down affordance (SIP-014)
-    btn.title = "Still don't understand? Show the Learner's dictionary definition";
-    btn.addEventListener('click', () => void onLearnersClick(btn));
-    return btn;
-  }
-
-  async function onLearnersClick(btn: HTMLButtonElement): Promise<void> {
-    if (!deps.lookupLearners || !currentLemma) return;
-    btn.disabled = true;
-    btn.textContent = "Looking it up in the Learner's dictionary…";
-    let result: Awaited<ReturnType<NonNullable<typeof deps.lookupLearners>>>;
-    try {
-      result = await deps.lookupLearners(currentLemma);
-    } catch {
-      result = { entry: null, reason: 'network' };
-    }
-    btn.remove();
-    renderLearnersSection(result);
-  }
-
-  function renderLearnersSection(
-    result: { entry: DictionaryEntry | null; reason?: 'notfound' | 'rejected' | 'nokey' | 'network' },
-  ): void {
-    card.querySelector('.learners')?.remove();
+  /**
+   * SIP-015: Apple-Dictionary-style simultaneous sources — when a key is
+   * configured, the Learner's section mounts directly below the
+   * definitions in a "Looking up…" state and fills when the (cached)
+   * lookup resolves. Misses/network errors remove it again; a rejected
+   * key stays visible because it is actionable.
+   */
+  async function attachLearners(lemma: string): Promise<void> {
+    if (!deps.lookupLearners) return;
+    const seq = lookupSeq;
     const section = document.createElement('div');
     section.className = 'learners';
     const header = document.createElement('div');
     header.className = 'learners-h';
     header.textContent = "Learner's dictionary · Merriam-Webster";
     section.append(header);
+    const state = document.createElement('p');
+    state.className = 'state';
+    state.textContent = 'Looking up…';
+    section.append(state);
+    // Mount in natural DOM order: right after the last rendered sense —
+    // no post-hoc insertion (the `.before() ?? append` bug class, SBFP'd
+    // in SIP-015, cannot recur).
+    const senses = card.querySelectorAll('.sense');
+    const lastSense = senses.length > 0 ? senses[senses.length - 1] : null;
+    if (lastSense) {
+      lastSense.after(section);
+    } else {
+      card.append(section);
+    }
+
+    let result: Awaited<ReturnType<NonNullable<typeof deps.lookupLearners>>>;
+    try {
+      result = await deps.lookupLearners(lemma);
+    } catch {
+      result = { entry: null, reason: 'network' };
+    }
+    if (seq !== lookupSeq || !section.isConnected) return; // superseded or closed
 
     if (result.entry) {
+      section.innerHTML = '';
+      section.append(header);
       const head = document.createElement('p');
       head.className = 'learners-head';
       head.append(result.entry.lemma);
@@ -437,24 +434,12 @@ export function createPopover(deps: PopoverDeps) {
         }
         section.append(wrap);
       }
-    } else {
-      const state = document.createElement('p');
-      state.className = 'state';
+    } else if (result.reason === 'rejected') {
       state.textContent =
-        result.reason === 'rejected'
-          ? "The Merriam-Webster key was rejected — check the Learner's dictionary section on the options page."
-          : result.reason === 'network'
-            ? "Couldn't reach Merriam-Webster — check your connection and try again."
-            : "The Learner's dictionary has no entry for this word.";
-      section.append(state);
+        "The Merriam-Webster key was rejected — check the Learner's dictionary section on the options page.";
+    } else {
+      section.remove(); // miss or network hiccup: Apple-style, absent sources are hidden
     }
-    // SIP-014: directly below the definition block — above the synonyms
-    // row, "Recently met", and the status row (whichever follows).
-    (
-      card.querySelector('.syn') ??
-      card.querySelector('.met') ??
-      card.querySelector('.status-row')
-    )?.before(section) ?? card.append(section);
   }
 
   function renderEntry(lemma: string, entry: DictionaryEntry, source: string, vocabEntry?: VocabEntry): void {
@@ -494,12 +479,11 @@ export function createPopover(deps: PopoverDeps) {
       card.append(wrap);
     }
 
-    // SIP-014: the "More ⌄" affordance closes the definition block,
-    // above the synonyms row. It appears only when the learner's
-    // definition could differ from what's shown — not when this entry
-    // already IS the learner's answer, and not without a configured key.
+    // SIP-015: simultaneous sources — the Learner's section mounts below
+    // the definitions when a key is configured and this entry is not
+    // already the learner's answer.
     if (deps.lookupLearners && (deps.hasLearnersKey?.() ?? true) && source !== 'mw') {
-      card.append(learnersButton());
+      void attachLearners(entry.lemma ?? lemma);
     }
 
     if (entry.synonyms?.length) {

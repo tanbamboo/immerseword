@@ -854,7 +854,7 @@ export const tests = [
     },
   },
   {
-    name: "learner's button: absent without a key, present with one (SIP-013)",
+    name: "learner's section: absent without a key, auto-mounts with one (SIP-015)",
     async run() {
       await withHarness(async ({ browser, baseUrl }) => {
         const page = await openArticle(browser, baseUrl);
@@ -866,15 +866,14 @@ export const tests = [
               ?.shadowRoot?.querySelector('.card .lemma')?.textContent === 'observe',
           { timeout: 15_000, polling: 500 },
         );
-        // No key configured → the button never renders (no click: a real
-        // network call is covered by unit tests with injected deps).
+        // No key configured → no Learner's section mounts at all.
         assert.equal(
           await page.evaluate(
             () =>
-              document.getElementById('iw-popover-host').shadowRoot.querySelector('.learners-btn') !== null,
+              document.getElementById('iw-popover-host').shadowRoot.querySelector('.learners') !== null,
           ),
           false,
-          'no button without a key',
+          'no learners section without a key',
         );
 
         // Store a key from an extension page (the options page owns it;
@@ -892,11 +891,14 @@ export const tests = [
           document.getElementById('iw-popover-host').shadowRoot.querySelector('.card .close').click();
         });
         await clickWord(page, 'observe');
+        // SIP-015: with a key set, the section mounts automatically below
+        // the definitions (placeholder state; the fake key's fetch outcome
+        // is timing-dependent, so only the mount is asserted here).
         await page.waitForFunction(
           () =>
             document
               .getElementById('iw-popover-host')
-              ?.shadowRoot?.querySelector('.card .learners-btn') !== null,
+              ?.shadowRoot?.querySelector('.card .learners .learners-h') !== null,
           { timeout: 15_000, polling: 500 },
         );
         await panel.evaluate(() => {
