@@ -496,14 +496,13 @@ async function selectWordInCard(card: HTMLElement, word: string): Promise<void> 
   sel?.addRange(range);
 }
 
-describe("Learner's dictionary button + section (SIP-013)", () => {
+describe("Learner's section, simultaneous with sources (SIP-015)", () => {
   const MW_ENTRY: DictionaryEntry = {
     lemma: 'observe',
     phonetic: '/əbˈzɜːrv/',
     senses: [{ partOfSpeech: 'verb', definition: 'to watch and listen carefully', example: 'Observe what happens.' }],
   };
-
-  type LearnersResult = { entry: DictionaryEntry | null; reason?: 'notfound' | 'rejected' | 'nokey' };
+  type LearnersResult = { entry: DictionaryEntry | null; reason?: 'notfound' | 'rejected' | 'nokey' | 'network' };
 
   function makeWithLearners(result: LearnersResult) {
     const lookupLearners = vi.fn(async (): Promise<LearnersResult> => result);
@@ -515,85 +514,70 @@ describe("Learner's dictionary button + section (SIP-013)", () => {
     return { popover, lookupLearners };
   }
 
-  it('renders the button when the dep exists and the entry is not from MW', async () => {
-    const { popover } = makeWithLearners({ entry: MW_ENTRY });
+  it('mounts below the definitions and fills automatically when a key is set', async () => {
+    const { popover, lookupLearners } = makeWithLearners({ entry: MW_ENTRY });
     await popover.openFor(null, 'observe');
-    expect(popover._card.querySelector('.learners-btn')?.textContent).toContain('More');
-    expect(popover._card.querySelector('.learners-btn')?.textContent).toContain('\u2304');
+    await vi.waitFor(() => {
+      expect(popover._card.querySelector('.learners .def')?.textContent).toContain('watch and listen');
+    });
+    expect(lookupLearners).toHaveBeenCalledWith('observe');
+    // Placement: directly after the definition senses, before any syn row.
+    const kids = [...popover._card.children];
+    const learnersAt = kids.findIndex((n) => n.classList.contains('learners'));
+    const lastSenseAt = kids.reduce((acc, n, i) => (n.classList.contains('sense') ? i : acc), -1);
+    expect(lastSenseAt).toBeGreaterThan(-1);
+    expect(learnersAt).toBe(lastSenseAt + 1);
+    // The original definition is still on top.
+    expect(popover._card.querySelector('.sense .def')?.textContent).toContain('discover or determine');
     popover.close();
   });
 
-  it('no button when hasLearnersKey says no key is stored (SIP-013)', async () => {
+  it('a miss or network hiccup removes the section (Apple-style hidden sources)', async () => {
+    for (const reason of ['notfound', 'network'] as const) {
+      const { popover } = makeWithLearners({ entry: null, reason });
+      await popover.openFor(null, 'observe');
+      await vi.waitFor(() => {
+        expect(popover._card.querySelector('.learners')).toBeNull();
+      });
+      popover.close();
+    }
+  });
+
+  it('a rejected key stays visible with its message', async () => {
+    const { popover } = makeWithLearners({ entry: null, reason: 'rejected' });
+    await popover.openFor(null, 'observe');
+    await vi.waitFor(() => {
+      expect(popover._card.querySelector('.learners .state')?.textContent).toContain('key was rejected');
+    });
+    popover.close();
+  });
+
+  it('no key configured → no section and no fetch', async () => {
+    const lookupLearners = vi.fn(async (): Promise<LearnersResult> => ({ entry: MW_ENTRY }));
     const popover = createPopover({
       lookup: async () => ({ entry: ENTRY, source: 'core' }),
-      lookupLearners: vi.fn(async (): Promise<{ entry: DictionaryEntry | null }> => ({ entry: MW_ENTRY })),
+      lookupLearners,
       hasLearnersKey: () => false,
       vocab: createVocabStore(fakeStorage()),
     });
     await popover.openFor(null, 'observe');
-    expect(popover._card.querySelector('.learners-btn')).toBeNull();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(popover._card.querySelector('.learners')).toBeNull();
+    expect(lookupLearners).not.toHaveBeenCalled();
     popover.close();
   });
 
-  it('no button without the dep, nor when the entry already is the learner answer', async () => {
-    const { popover } = makePopover(); // no lookupLearners dep
-    await popover.openFor(null, 'observe');
-    expect(popover._card.querySelector('.learners-btn')).toBeNull();
-    popover.close();
-
-    const mw = createPopover({
+  it('no section when the entry already IS the learner answer (source mw)', async () => {
+    const lookupLearners = vi.fn(async (): Promise<LearnersResult> => ({ entry: MW_ENTRY }));
+    const popover = createPopover({
       lookup: async () => ({ entry: MW_ENTRY, source: 'mw' }),
-      lookupLearners: vi.fn(
-        async (): Promise<{ entry: DictionaryEntry | null; reason?: 'notfound' }> => ({
-          entry: null,
-          reason: 'notfound',
-        }),
-      ),
+      lookupLearners,
       vocab: createVocabStore(fakeStorage()),
     });
-    await mw.openFor(null, 'observe');
-    expect(mw._card.querySelector('.learners-btn')).toBeNull();
-    mw.close();
-  });
-
-  it('clicking fetches and renders the Learner section under the definition', async () => {
-    const { popover, lookupLearners } = makeWithLearners({ entry: MW_ENTRY });
     await popover.openFor(null, 'observe');
-    (popover._card.querySelector('.learners-btn') as HTMLButtonElement).click();
-    await vi.waitFor(() => {
-      expect(popover._card.querySelector('.learners')).not.toBeNull();
-    });
-    expect(lookupLearners).toHaveBeenCalledWith('observe');
-    expect(popover._card.querySelector('.learners-head')?.textContent).toContain('observe');
-    expect(popover._card.querySelector('.learners .def')?.textContent).toContain('watch and listen');
-    // SIP-014: the expanded section renders directly below the definition
-    // block — ahead of the synonyms row when one exists.
-    const cardChildren = [...popover._card.children];
-    const learnersAt = cardChildren.findIndex((n) => n.classList.contains('learners'));
-    const synAt = cardChildren.findIndex((n) => n.classList.contains('syn'));
-    if (synAt !== -1) expect(learnersAt).toBeLessThan(synAt);
-    expect(learnersAt).toBeGreaterThan(cardChildren.findIndex((n) => n.classList.contains('sense')));
-    // Original definition still on top; button replaced by the section.
-    expect(popover._card.querySelector('.learners-btn')).toBeNull();
-    expect(popover._card.querySelector('.def')?.textContent).toContain('discover or determine');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(popover._card.querySelector('.learners')).toBeNull();
+    expect(lookupLearners).not.toHaveBeenCalled();
     popover.close();
-  });
-
-  it('a rejected key explains itself; a miss says so', async () => {
-    const rejected = makeWithLearners({ entry: null, reason: 'rejected' });
-    await rejected.popover.openFor(null, 'observe');
-    (rejected.popover._card.querySelector('.learners-btn') as HTMLButtonElement).click();
-    await vi.waitFor(() => {
-      expect(rejected.popover._card.querySelector('.learners .state')?.textContent).toContain('key was rejected');
-    });
-    rejected.popover.close();
-
-    const missing = makeWithLearners({ entry: null, reason: 'notfound' });
-    await missing.popover.openFor(null, 'observe');
-    (missing.popover._card.querySelector('.learners-btn') as HTMLButtonElement).click();
-    await vi.waitFor(() => {
-      expect(missing.popover._card.querySelector('.learners .state')?.textContent).toContain('no entry');
-    });
-    missing.popover.close();
   });
 });

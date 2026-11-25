@@ -196,3 +196,17 @@ Analysis and implementation live in [../sip_logs.md](../sip_logs.md).
 > the button "still don't understand ..." is too ugly, change to
 > "More >>(arrow toward down)", at the bottom right of the "definition
 > section" of popover window.
+
+---
+
+## feat-2026-11-25-005 — Apple-Dictionary-style simultaneous sources display
+
+**Recorded:** 2026-11-25 14:34 +0800
+**Source:** user request (ZCode session — with Apple Dictionary app screenshot)
+**Status:** implemented — PR-43 (`pr/43-simultaneous-sources`); see SIP-015
+
+**Raw request:**
+
+> but the "Learner's dictionary · Merriam-Webster" section is still in
+> the bottom. maybe you can display multi dictionary in the same time,
+> like Apple Dictionary App snapshot
