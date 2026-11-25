@@ -117,6 +117,17 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) =>
     });
     return true; // async response
   }
+  if (msg?.type === 'DICT_LOOKUP_LEARNERS') {
+    void dictionary.lookupLearners(msg.lemma).then((result) => {
+      sendResponse({
+        type: 'DICT_RESULT_LEARNERS',
+        lemma: msg.lemma,
+        entry: result.entry,
+        reason: result.reason,
+      } satisfies IwMessage);
+    });
+    return true; // async response
+  }
 
   /* Session messages arrive from the content script (sender.tab set), or
      from the side panel, which names its target tab explicitly (an SW-side

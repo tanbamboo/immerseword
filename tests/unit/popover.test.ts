@@ -495,3 +495,97 @@ async function selectWordInCard(card: HTMLElement, word: string): Promise<void> 
   sel?.removeAllRanges();
   sel?.addRange(range);
 }
+
+describe("Learner's dictionary button + section (SIP-013)", () => {
+  const MW_ENTRY: DictionaryEntry = {
+    lemma: 'observe',
+    phonetic: '/əbˈzɜːrv/',
+    senses: [{ partOfSpeech: 'verb', definition: 'to watch and listen carefully', example: 'Observe what happens.' }],
+  };
+
+  type LearnersResult = { entry: DictionaryEntry | null; reason?: 'notfound' | 'rejected' | 'nokey' };
+
+  function makeWithLearners(result: LearnersResult) {
+    const lookupLearners = vi.fn(async (): Promise<LearnersResult> => result);
+    const popover = createPopover({
+      lookup: async () => ({ entry: ENTRY, source: 'core' }),
+      lookupLearners,
+      vocab: createVocabStore(fakeStorage()),
+    });
+    return { popover, lookupLearners };
+  }
+
+  it('renders the button when the dep exists and the entry is not from MW', async () => {
+    const { popover } = makeWithLearners({ entry: MW_ENTRY });
+    await popover.openFor(null, 'observe');
+    expect(popover._card.querySelector('.learners-btn')?.textContent).toContain("Still don't understand");
+    popover.close();
+  });
+
+  it('no button when hasLearnersKey says no key is stored (SIP-013)', async () => {
+    const popover = createPopover({
+      lookup: async () => ({ entry: ENTRY, source: 'core' }),
+      lookupLearners: vi.fn(async (): Promise<{ entry: DictionaryEntry | null }> => ({ entry: MW_ENTRY })),
+      hasLearnersKey: () => false,
+      vocab: createVocabStore(fakeStorage()),
+    });
+    await popover.openFor(null, 'observe');
+    expect(popover._card.querySelector('.learners-btn')).toBeNull();
+    popover.close();
+  });
+
+  it('no button without the dep, nor when the entry already is the learner answer', async () => {
+    const { popover } = makePopover(); // no lookupLearners dep
+    await popover.openFor(null, 'observe');
+    expect(popover._card.querySelector('.learners-btn')).toBeNull();
+    popover.close();
+
+    const mw = createPopover({
+      lookup: async () => ({ entry: MW_ENTRY, source: 'mw' }),
+      lookupLearners: vi.fn(
+        async (): Promise<{ entry: DictionaryEntry | null; reason?: 'notfound' }> => ({
+          entry: null,
+          reason: 'notfound',
+        }),
+      ),
+      vocab: createVocabStore(fakeStorage()),
+    });
+    await mw.openFor(null, 'observe');
+    expect(mw._card.querySelector('.learners-btn')).toBeNull();
+    mw.close();
+  });
+
+  it('clicking fetches and renders the Learner section under the definition', async () => {
+    const { popover, lookupLearners } = makeWithLearners({ entry: MW_ENTRY });
+    await popover.openFor(null, 'observe');
+    (popover._card.querySelector('.learners-btn') as HTMLButtonElement).click();
+    await vi.waitFor(() => {
+      expect(popover._card.querySelector('.learners')).not.toBeNull();
+    });
+    expect(lookupLearners).toHaveBeenCalledWith('observe');
+    expect(popover._card.querySelector('.learners-head')?.textContent).toContain('observe');
+    expect(popover._card.querySelector('.learners .def')?.textContent).toContain('watch and listen');
+    // Original definition still on top; button replaced by the section.
+    expect(popover._card.querySelector('.learners-btn')).toBeNull();
+    expect(popover._card.querySelector('.def')?.textContent).toContain('discover or determine');
+    popover.close();
+  });
+
+  it('a rejected key explains itself; a miss says so', async () => {
+    const rejected = makeWithLearners({ entry: null, reason: 'rejected' });
+    await rejected.popover.openFor(null, 'observe');
+    (rejected.popover._card.querySelector('.learners-btn') as HTMLButtonElement).click();
+    await vi.waitFor(() => {
+      expect(rejected.popover._card.querySelector('.learners .state')?.textContent).toContain('key was rejected');
+    });
+    rejected.popover.close();
+
+    const missing = makeWithLearners({ entry: null, reason: 'notfound' });
+    await missing.popover.openFor(null, 'observe');
+    (missing.popover._card.querySelector('.learners-btn') as HTMLButtonElement).click();
+    await vi.waitFor(() => {
+      expect(missing.popover._card.querySelector('.learners .state')?.textContent).toContain('no entry');
+    });
+    missing.popover.close();
+  });
+});

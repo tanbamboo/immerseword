@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ImmerseWord",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Tag unknown words, read English with monolingual definitions, and master pages with the 3-pass reading method.",
   "minimum_chrome_version": "120",
   "icons": {

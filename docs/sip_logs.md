@@ -566,3 +566,47 @@ PR merges. Append-only — never rewrite a merged proposal.
   storage.local; no network in tests). v1.0.3 packaged. Default behavior
   byte-identical for users without a key — the tier only activates when
   `iw:mwKey` is set.
+
+---
+
+## SIP-013 — on-demand Learner's section in the popover ("I still don't understand")
+
+- **Requested:** 2026-11-25 (`feat-2026-11-25-001`)
+- **Motivation:** SIP-012 appended Merriam-Webster Learner's last in the
+  chain (reporter's chosen order), so it never fires for words the other
+  tiers already answer — which is precisely the reporter's real case:
+  definitions that exist but don't enlighten. The reporter prefers an
+  explicit in-popover action over reordering the chain.
+- **Scope:** when a MW key is configured and the current entry did not
+  come from the learner's tier, the popover shows a full-width button —
+  "Still don't understand? Show the Learner's dictionary definition" —
+  below the senses/synonyms. Tapping it fetches (or recalls from a
+  namespaced cache) the MW Learner's entry and renders it as a new
+  section under the original definition: headword, phonetics, ≤3 senses
+  with examples, styled like the other popover sections. The original
+  definition stays on top; nothing about the automatic chain changes.
+- **Technical approach:** dictionary service gains
+  `lookupLearners(lemma)` — straight to the MW tier, cached under
+  `mw:<lemma>` in the existing LRU (separate namespace: the automatic
+  chain never sees these entries; quota-friendly on repeat taps) — with
+  a result reason (`notfound` / `rejected` / `nokey`) so the section can
+  say "no entry" vs "key rejected — check the options page". New
+  `DICT_LOOKUP_LEARNERS` message through the SW router; popover dep
+  `lookupLearners`; per-render state — Back snapshots don't carry the
+  fetched section (it is one tap away again).
+- **Test plan:** unit — service (namespaced cache hit makes no fetch,
+  404 → notfound, 403 → rejected, no key → nokey without fetching);
+  popover (button hidden without dep / when source is already 'mw' /
+  when there is no entry; click renders the section with senses;
+  notfound/rejected messages). e2e — without a key the button is absent;
+  with a key stored the button appears (no network call in tests — the
+  click path is covered by unit tests with injected deps).
+- **Risks / edge cases:** one extra network round-trip per word, only on
+  explicit request; per-render state means re-tapping after Back —
+  cache makes it instant; quota consumption bounded by user curiosity.
+- **Docs:** PRD F2 bullet; version history row.
+- **Outcome:** implemented in PR-39 (`pr/39-learners-button`). Gates:
+  typecheck, unit 175/175, e2e 42/42. The e2e caught a real flaw before
+  ship: the button originally rendered with no key configured (a dead
+  button) — now gated on key presence, tracked live via storage.onChanged.
+  v1.0.4 packaged (964 KB).

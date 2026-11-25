@@ -369,3 +369,47 @@ describe("Merriam-Webster Learner's tier (SIP-012)", () => {
     expect(result.entry).toBeNull();
   });
 });
+
+describe("on-demand lookupLearners (SIP-013)", () => {
+  it('answers from the mw: namespace cache without refetching', async () => {
+    const { service, fetchCalls } = makeService({ mwKey: 'k' });
+    const first = await service.lookupLearners('qat');
+    expect(first.entry?.senses[0]?.definition).toContain('stimulant');
+    const second = await service.lookupLearners('qat');
+    expect(second.entry).not.toBeNull();
+    expect(fetchCalls.filter((u) => u.includes('dictionaryapi.com'))).toHaveLength(1);
+  });
+
+  it('does not pollute the automatic chain cache', async () => {
+    const { service } = makeService({ mwKey: 'k' });
+    await service.lookupLearners('qat'); // caches under mw:qat
+    // The plain chain for qat: core miss → dev 404 → MW tier (chain path,
+    // own cache key) → answers 'mw' via a second network call.
+    const chain = await service.lookup('qat');
+    expect(chain.source).toBe('mw');
+  });
+
+  it('404 → notfound; 403 → rejected; no key → nokey without fetching', async () => {
+    const { service, fetchCalls } = makeService({ mwKey: 'k' });
+    expect((await service.lookupLearners('zzzznope')).reason).toBe('notfound');
+
+    const rejected = makeService({ mwKey: 'k' });
+    rejected.service = createDictionaryService({
+      fetchImpl: (async (url: string) => {
+        if (url.includes('dictionaryapi.com')) {
+          return { ok: false, status: 403, json: async () => ({}) };
+        }
+        return { ok: false, status: 404, json: async () => ({}) };
+      }) as never,
+      storage: fakeStorage(),
+      loadCore: async () => null,
+      getSettings: async () => DEFAULT_SETTINGS,
+      getMwKey: async () => 'k',
+    });
+    expect((await rejected.service.lookupLearners('qat')).reason).toBe('rejected');
+
+    const nokey = makeService();
+    expect((await nokey.service.lookupLearners('qat')).reason).toBe('nokey');
+    expect(fetchCalls.filter((u) => u.includes('dictionaryapi.com')).length).toBeLessThan(3);
+  });
+});

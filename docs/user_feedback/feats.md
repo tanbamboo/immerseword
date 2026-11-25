@@ -164,3 +164,18 @@ Analysis and implementation live in [../sip_logs.md](../sip_logs.md).
 > even with drill down. is it possible to support some Learner's
 > dictionary, such as Oxford Leaner's dictionary, Cambridge Leaner's
 > dictionary, etc?
+
+---
+
+## feat-2026-11-25-001 — "I still don't understand" button for the Learner's dictionary
+
+**Recorded:** 2026-11-25 09:06 +0800
+**Source:** user request (ZCode session — after testing SIP-012; supersedes the chain-flip question)
+**Status:** implemented — PR-39 (`pr/39-learners-button`); see SIP-013
+
+**Raw request:**
+
+> (answering "flip the lookup order?") I prefer a button named like
+> "I still don't understand, show me the definition from Learner's
+> dictionary" in the popover window, and then a new section to display
+> the definition from Learner's dictionary.

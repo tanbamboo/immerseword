@@ -28,7 +28,7 @@ const POS_LABEL: Record<string, string> = {
   r: 'adverb',
 };
 
-export type DictSource = 'core' | 'api' | 'mw' | 'cache' | 'none';
+export type DictSource = 'core' | 'api' | 'mw' | 'cache' | 'error' | 'none';
 
 export interface LookupResult {
   lemma: string;
@@ -153,25 +153,27 @@ export function createDictionaryService(deps: DictionaryDeps) {
    * SIP-012 tier 3 — Merriam-Webster Learner's Dictionary, only when the
    * user pasted a key (dictionaryapi.com, free non-commercial tier).
    * 404s negative-cache like the other tiers; auth failures do NOT (the
-   * key may be fixed on the options page at any time).
+   * key may be fixed on the options page at any time). `cacheKey`
+   * namespaces the on-demand path (SIP-013) so it never pollutes the
+   * automatic chain's entries.
    */
-  async function fromMwLearners(lemma: string, key: string): Promise<LookupResult> {
+  async function fromMwLearners(lemma: string, key: string, cacheKey = lemma): Promise<LookupResult> {
     try {
       const res = await deps.fetchImpl(
         `https://api.dictionaryapi.com/api/v3/references/learners/json/${encodeURIComponent(lemma)}?key=${encodeURIComponent(key)}`,
         { signal: AbortSignal.timeout(8_000) },
       );
       if (!res.ok) {
-        if (res.status === 404) await writeCache(lemma, { neg: Date.now() });
+        if (res.status === 404) await writeCache(cacheKey, { neg: Date.now() });
         else console.warn('[ImmerseWord] Merriam-Webster Learner\'s request failed:', res.status);
-        return { lemma, entry: null, source: 'none' };
+        return { lemma, entry: null, source: res.status === 401 || res.status === 403 ? 'error' : 'none' };
       }
       const entry = normalizeMwLearnersEntry(lemma, await res.json());
       if (!entry) {
-        await writeCache(lemma, { neg: Date.now() });
+        await writeCache(cacheKey, { neg: Date.now() });
         return { lemma, entry: null, source: 'none' };
       }
-      await writeCache(lemma, { e: entry });
+      await writeCache(cacheKey, { e: entry });
       return { lemma, entry, source: 'mw' };
     } catch {
       return { lemma, entry: null, source: 'none' };
@@ -179,6 +181,27 @@ export function createDictionaryService(deps: DictionaryDeps) {
   }
 
   return {
+    /**
+     * SIP-013: on-demand Learner's lookup — straight to the MW tier,
+     * cached under a `mw:` namespace so the automatic chain never sees
+     * these entries. Reasons: 'nokey' (tier disabled), 'rejected' (the
+     * key was refused — point the user at the options page), 'notfound'.
+     */
+    async lookupLearners(
+      rawLemma: string,
+    ): Promise<{ entry: DictionaryEntry | null; reason?: 'notfound' | 'rejected' | 'nokey' }> {
+      const surface = rawLemma.toLowerCase().trim();
+      if (!surface) return { entry: null, reason: 'notfound' };
+      const key = (await deps.getMwKey()).trim();
+      if (!key) return { entry: null, reason: 'nokey' };
+      const cacheKey = `mw:${surface}`;
+      const cached = await readCache(cacheKey);
+      if (cached) return cached.entry ? { entry: cached.entry } : { entry: null, reason: 'notfound' };
+      const result = await fromMwLearners(surface, key, cacheKey);
+      if (result.entry) return { entry: result.entry };
+      return { entry: null, reason: result.source === 'error' ? 'rejected' : 'notfound' };
+    },
+
     async lookup(rawLemma: string): Promise<LookupResult> {
       const surface = rawLemma.toLowerCase().trim();
       if (!surface) return { lemma: surface, entry: null, source: 'none' };

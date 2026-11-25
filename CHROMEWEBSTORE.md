@@ -161,6 +161,7 @@ https://github.com/tanbamboo/immerseword
 | Version | Date | Changes | Status |
 |---------|------|---------|--------|
 | 1.0.0 | 2026-11-19 | First release. **Note:** the uploaded package was the build from just after the `key`-stripping fix (SBFP-009) — it predates the icon regeneration (SBFP-010), synonyms, definition links, stacked navigation, and quiet tagging. | **Published** |
+| 1.0.4 | 2026-11-25 | New "Still don't understand?" button in the word popover: fetches the Merriam-Webster Learner's Dictionary definition (full-sentence, learner-friendly) on demand and shows it under the original — requires the optional API key from settings. | Pending upload |
 | 1.0.3 | 2026-11-24 | Optional Merriam-Webster Learner's Dictionary tier: paste your free API key (dictionaryapi.com) in settings; full-sentence learner definitions answer when the offline dictionary and online fallback both miss. | Pending upload |
 | 1.0.2 | 2026-11-24 | Non-English words are never tagged: unlisted words now validate against the bundled WordNet lexicon (77,561 lemmas, offline). | Pending upload |
 | 1.0.1 | 2026-11-23 | Quiet tagging default (Learning/Unknown + beyond-corpus words; Study pass elevates to the full band; "Tag density" setting keeps legacy marking). Synonyms row in the popover (WordNet synsets, offline). Tappable rare words inside definitions + double-click any word in the popover + stacked lookups with ‹ Back. Larger headword. Correct-size manifest icons (16/48/128 px). | Pending upload |

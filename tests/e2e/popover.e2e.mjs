@@ -853,4 +853,58 @@ export const tests = [
       });
     },
   },
+  {
+    name: "learner's button: absent without a key, present with one (SIP-013)",
+    async run() {
+      await withHarness(async ({ browser, baseUrl }) => {
+        const page = await openArticle(browser, baseUrl);
+        await clickWord(page, 'observe');
+        await page.waitForFunction(
+          () =>
+            document
+              .getElementById('iw-popover-host')
+              ?.shadowRoot?.querySelector('.card .lemma')?.textContent === 'observe',
+          { timeout: 15_000, polling: 500 },
+        );
+        // No key configured → the button never renders (no click: a real
+        // network call is covered by unit tests with injected deps).
+        assert.equal(
+          await page.evaluate(
+            () =>
+              document.getElementById('iw-popover-host').shadowRoot.querySelector('.learners-btn') !== null,
+          ),
+          false,
+          'no button without a key',
+        );
+
+        // Store a key from an extension page (the options page owns it;
+        // writing storage.local from the page context is the same path).
+        const extensionId = (await import('./harness.mjs')).getExtensionId(browser);
+        const panel = await (await import('./harness.mjs')).openExtensionPage(
+          browser,
+          extensionId,
+          'sidepanel/sidepanel.html',
+        );
+        await panel.evaluate(() => {
+          chrome.storage.local.set({ 'iw:mwKey': 'e2e-key' });
+        });
+        await page.evaluate(() => {
+          document.getElementById('iw-popover-host').shadowRoot.querySelector('.card .close').click();
+        });
+        await clickWord(page, 'observe');
+        await page.waitForFunction(
+          () =>
+            document
+              .getElementById('iw-popover-host')
+              ?.shadowRoot?.querySelector('.card .learners-btn') !== null,
+          { timeout: 15_000, polling: 500 },
+        );
+        await panel.evaluate(() => {
+          chrome.storage.local.remove(['iw:mwKey']);
+        });
+        await panel.close();
+        await page.close();
+      });
+    },
+  },
 ];

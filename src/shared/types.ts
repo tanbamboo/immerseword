@@ -27,7 +27,14 @@ export type IwMessage =
       type: 'DICT_RESULT';
       lemma: string;
       entry: DictionaryEntry | null;
-      source: 'core' | 'api' | 'cache' | 'none';
+      source: 'core' | 'api' | 'mw' | 'cache' | 'none';
+    }
+  | { type: 'DICT_LOOKUP_LEARNERS'; lemma: string }
+  | {
+      type: 'DICT_RESULT_LEARNERS';
+      lemma: string;
+      entry: DictionaryEntry | null;
+      reason?: 'notfound' | 'rejected' | 'nokey';
     }
   | { type: 'IW_SHOW_LOOKUP'; lemma: string }
   | { type: 'GET_PAGE_DATA' }

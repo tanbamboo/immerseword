@@ -79,6 +79,17 @@ async function loadFrequencyWords(): Promise<string[]> {
   }
 }
 
+/** SIP-013: whether the optional Learner's dictionary key is stored. */
+let mwKeyPresent = false;
+function refreshMwKeyPresent(): void {
+  void chrome.storage.local
+    .get(['iw:mwKey'])
+    .then((found: Record<string, unknown>) => {
+      mwKeyPresent = typeof found['iw:mwKey'] === 'string' && (found['iw:mwKey'] as string).length > 0;
+    })
+    .catch(() => undefined);
+}
+
 /** SBFP-011: WordNet-derived lexicon separating rare English from non-English. */
 async function loadEnglishLemmas(): Promise<Set<string>> {
   try {
@@ -120,6 +131,21 @@ async function lookupDefinition(
   return { entry: response?.entry ?? null, source: response?.source ?? 'none' };
 }
 
+/** SIP-013: on-demand Learner's lookup for the popover's "still don't understand" action. */
+async function lookupLearnersDefinition(
+  lemma: string,
+): Promise<{ entry: import('../shared/types').DictionaryEntry | null; reason?: 'notfound' | 'rejected' | 'nokey' }> {
+  const response = (await chrome.runtime.sendMessage({
+    type: 'DICT_LOOKUP_LEARNERS',
+    lemma,
+  })) as {
+    type?: string;
+    entry?: import('../shared/types').DictionaryEntry | null;
+    reason?: 'notfound' | 'rejected' | 'nokey';
+  };
+  return { entry: response?.entry ?? null, reason: response?.reason };
+}
+
 async function init(): Promise<void> {
   currentSettings = await getSettings(chrome.storage.sync as SyncStorageLike);
   const words = await loadFrequencyWords();
@@ -139,8 +165,11 @@ async function init(): Promise<void> {
   tagger = createTagger({ frequency: index, settings: currentSettings, isEnglish });
   tagger.setVocab({ statusOf: (lemma) => statusMap.get(lemma) });
 
+  refreshMwKeyPresent();
   const popover = createPopover({
     lookup: lookupDefinition,
+    lookupLearners: lookupLearnersDefinition,
+    hasLearnersKey: () => mwKeyPresent,
     vocab,
     isWordForm: (lemma, token) => lemmatizer.lemma(token.toLowerCase()) === lemma,
     // SIP-007: words rarer than the level (minus known/ignored) chain lookups.
@@ -312,6 +341,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 /* ── vocabulary changes from other contexts (side panel) ───────────────── */
 
 chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes['iw:mwKey']) refreshMwKeyPresent();
   if (area !== 'local' || !changes['iw:vocab'] || !tagger) return;
   const prev = (changes['iw:vocab'].oldValue ?? {}) as Record<string, { status: WordStatus }>;
   const next = (changes['iw:vocab'].newValue ?? {}) as Record<string, { status: WordStatus }>;

@@ -21,6 +21,15 @@ export interface PopoverDeps {
    * user's level, minus known/ignored vocabulary).
    */
   isLinkable?: (token: string) => boolean;
+  /**
+   * SIP-013: on-demand Merriam-Webster Learner's lookup for the popover's
+   * "still don't understand" action. Absent ⇒ the button never renders.
+   */
+  lookupLearners?: (
+    lemma: string,
+  ) => Promise<{ entry: DictionaryEntry | null; reason?: 'notfound' | 'rejected' | 'nokey' }>;
+  /** SIP-013: whether a Learner's key is stored — false hides the button. */
+  hasLearnersKey?: () => boolean;
 }
 
 const STYLE = `
@@ -107,6 +116,21 @@ const STYLE = `
     font-size: 12px; color: #616e7c; padding: 2px 6px; border-radius: 6px;
   }
   .back:hover { background: #efece4; color: #1f2933; }
+  /* SIP-013: on-demand Learner's dictionary section. */
+  .learners-btn {
+    display: block; width: 100%; margin-top: 10px; padding: 7px 0;
+    border: 1px dashed #c7d2fe; background: #f8faff; color: #4338ca;
+    border-radius: 8px; font-size: 12px; cursor: pointer; text-align: center;
+  }
+  .learners-btn:hover { background: #eef2ff; border-color: #4f46e5; }
+  .learners-btn:disabled { color: #9aa5b1; cursor: default; }
+  .learners { margin-top: 10px; border-top: 1px dashed #ece8df; padding-top: 8px; }
+  .learners-h {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em;
+    color: #9aa5b1;
+  }
+  .learners-head { margin: 4px 0 0; font-weight: 700; font-size: 14px; }
+  .learners-head .phon { color: #616e7c; font-size: 12px; font-weight: 400; margin-left: 6px; }
 `;
 
 const STATUS_LABELS: Array<[WordStatus, string]> = [
@@ -345,6 +369,86 @@ export function createPopover(deps: PopoverDeps) {
       : token.toLowerCase() === headword;
   }
 
+  /** SIP-013: the "still don't understand" action — fetch and render the Learner's entry below. */
+  function learnersButton(): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'learners-btn';
+    btn.textContent = "Still don't understand? Show the Learner's dictionary definition";
+    btn.addEventListener('click', () => void onLearnersClick(btn));
+    return btn;
+  }
+
+  async function onLearnersClick(btn: HTMLButtonElement): Promise<void> {
+    if (!deps.lookupLearners || !currentLemma) return;
+    btn.disabled = true;
+    btn.textContent = "Looking it up in the Learner's dictionary…";
+    let result: Awaited<ReturnType<NonNullable<typeof deps.lookupLearners>>>;
+    try {
+      result = await deps.lookupLearners(currentLemma);
+    } catch {
+      result = { entry: null, reason: 'notfound' };
+    }
+    btn.remove();
+    renderLearnersSection(result);
+  }
+
+  function renderLearnersSection(
+    result: { entry: DictionaryEntry | null; reason?: 'notfound' | 'rejected' | 'nokey' },
+  ): void {
+    card.querySelector('.learners')?.remove();
+    const section = document.createElement('div');
+    section.className = 'learners';
+    const header = document.createElement('div');
+    header.className = 'learners-h';
+    header.textContent = "Learner's dictionary · Merriam-Webster";
+    section.append(header);
+
+    if (result.entry) {
+      const head = document.createElement('p');
+      head.className = 'learners-head';
+      head.append(result.entry.lemma);
+      if (result.entry.phonetic) {
+        const phon = document.createElement('span');
+        phon.className = 'phon';
+        phon.textContent = result.entry.phonetic;
+        head.append(phon);
+      }
+      section.append(head);
+      for (const sense of result.entry.senses.slice(0, 3)) {
+        const wrap = document.createElement('div');
+        wrap.className = 'sense';
+        if (sense.partOfSpeech) {
+          const pos = document.createElement('span');
+          pos.className = 'pos';
+          pos.textContent = sense.partOfSpeech;
+          wrap.append(pos);
+        }
+        const def = document.createElement('p');
+        def.className = 'def';
+        def.textContent = sense.definition;
+        wrap.append(def);
+        if (sense.example) {
+          const ex = document.createElement('p');
+          ex.className = 'ex';
+          ex.textContent = `“${sense.example}”`;
+          wrap.append(ex);
+        }
+        section.append(wrap);
+      }
+    } else {
+      const state = document.createElement('p');
+      state.className = 'state';
+      state.textContent =
+        result.reason === 'rejected'
+          ? "The Merriam-Webster key was rejected — check the Learner's dictionary section on the options page."
+          : "The Learner's dictionary has no entry for this word.";
+      section.append(state);
+    }
+    // Insert above the personal-examples section if present, else above the status row.
+    card.querySelector('.met')?.before(section) ?? card.querySelector('.status-row')?.before(section) ?? card.append(section);
+  }
+
   function renderEntry(lemma: string, entry: DictionaryEntry, source: string, vocabEntry?: VocabEntry): void {
     const activeStatus = vocabEntry?.status;
     card.innerHTML = '';
@@ -384,6 +488,13 @@ export function createPopover(deps: PopoverDeps) {
 
     if (entry.synonyms?.length) {
       card.append(synonymsSection(entry.synonyms));
+    }
+
+    // SIP-013: offer the learner's definition when it could differ from
+    // what's shown — not when this entry already IS the learner's answer,
+    // and not without a configured key (a dead button teaches nothing).
+    if (deps.lookupLearners && (deps.hasLearnersKey?.() ?? true) && source !== 'mw') {
+      card.append(learnersButton());
     }
 
     if (vocabEntry?.examples?.length) {
